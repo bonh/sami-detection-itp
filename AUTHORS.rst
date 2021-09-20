@@ -3,3 +3,5 @@ Contributors
 ============
 
 * Henning Bonart <bonart@nmf.tu-darmstadt.de>
+* Lukas Hecht <lukas.hecht@tu-darmstadt.de>
+* Florian Gebhard <gebhard@nmf.tu-darmstadt.de>
