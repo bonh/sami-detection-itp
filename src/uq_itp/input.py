@@ -1,9 +1,8 @@
 import numpy as np
 from nd2reader import ND2Reader
 
-def load_nd_data(inname, startframe=0, endframe=-1):
+def load_nd_data(inname, startframe=0, endframe=-1, verbose=False):
     with ND2Reader(inname) as rawimages:
-        print(rawimages)
         rawimages.bundle_axes = 'yx' # defines which axes will be present in a single frame
         rawimages.iter_axes = 't' # defines which axes will be the index axis; t-axis is the time axis
     
@@ -12,7 +11,8 @@ def load_nd_data(inname, startframe=0, endframe=-1):
         width = rawimages.metadata["width"]
         nframes = rawimages.metadata["num_frames"]
         
-        print("\nheight = {}, width = {}, nframes = {}".format(height, width, nframes))
+        if verbose:
+            print("\nheight = {}, width = {}, nframes = {}".format(height, width, nframes))
         
         if endframe == -1:
             end = len(rawimages)
@@ -33,5 +33,18 @@ def load_nd_data(inname, startframe=0, endframe=-1):
         for frame in np.arange(startframe, end, 1):
             data[:,:,frame] = rawimages[frame]
     
-        print("\ndata shape = {}".format(data.shape))
+        if verbose:
+            print("\ndata shape = {}".format(data.shape))
         return data
+
+def cuttochannel(data, upperrow, lowerrow):
+    height = data.shape[0]
+    frow = int(height/2 - upperrow)
+    lrow = int(height/2 + lowerrow)
+    return data[frow:lrow,:,:]
+
+def substractbackground(data, background):
+    return data - background.reshape(background.shape[0], background.shape[1],1)
+
+def averageoverheight(data):
+    return np.mean(data, axis=0)
