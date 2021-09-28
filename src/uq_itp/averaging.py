@@ -35,6 +35,8 @@ def rawimages2heightaveraged(inname):
     data_raw = input.substractbackground(data_raw, background)
     return input.averageoverheight(data_raw)
 
+data = rawimages2heightaveraged(inname)
+
 time = 200
 fig,axs = plt.subplots(2,1,sharex=True, figsize=(7,5))
 axs[0].plot(data[:,time])
@@ -140,7 +142,7 @@ data_shifted = shift_data(data_in, v, fps, px)
 avg = np.mean(data_shifted, axis=0)
 # -
 
-plt.plot(avg)
+plt.imshow(data_shifted)
 
 # +
 x = np.linspace(0, len(avg), len(avg))
