@@ -8,7 +8,7 @@ def shift_data(data, v, fps, px):
         shift = data.shape[0] - int(i*dx/px)%data.shape[0]
         data_shifted[:,i] = np.roll(data[:,i], shift)
     
-    data_shifted = np.roll(data_shifted, int(data_shifted.shape[1]/2), axis=1)
+    #data_shifted = np.roll(data_shifted, int(data_shifted.shape[1]/2), axis=1)
     
     return data_shifted
 

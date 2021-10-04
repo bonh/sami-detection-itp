@@ -38,9 +38,11 @@ basepath = "/home/cb51neqa/projects/itp/exp_data/"
 innames = []
 for root, dirs, files in os.walk(basepath):
     for file in files:
-        if(file.endswith(".nd2")):
-            innames.append(os.path.join(root,file))
+        if "nd2" in file:
+            if(file.endswith(".nd2")):
+                innames.append(os.path.join(root,file))
 
+innames = innames[20:]
 pprint(innames)
 
 # +
@@ -62,5 +64,7 @@ axs[i].set_xlabel("x");
 
 fig.tight_layout()
 fig.savefig("heightaveraged.pdf")
+
+
 
 
