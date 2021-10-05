@@ -34,15 +34,17 @@ def main(inname, channel, lagstep, frames):
         trace_noiseonly = pm.sample(10000, return_inferencedata=True)
         
     dfwaic = pm.compare({"sample":trace_mean, "noiseonly":trace_noiseonly}, ic="waic")
+    dfloo = pm.compare({"sample":trace_mean, "noiseonly":trace_noiseonly}, ic="loo")
     
-    return dfwaic
+    return dfwaic, dfloo
     
 if __name__ == "__main__":
     
-    inname = "/home/cb51neqa/projects/itp/exp_data/ITP_AF647_5µA/AF_0.1ng_l/003.nd2"
+    inname = "/home/cb51neqa/projects/itp/exp_data/ITP_AF647_5µA/AF_0.1ng_l/001.nd2"
     channel = [27, 27]
     lagstep = 30
     frames = [100,300]
-    dfwaic = main(inname, channel, lagstep, frames)
+    dfwaic, dfloo = main(inname, channel, lagstep, frames)
     
     print(dfwaic)
+    print(dfloo)
