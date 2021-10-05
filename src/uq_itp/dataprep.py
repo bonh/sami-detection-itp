@@ -60,3 +60,9 @@ def shift_data(data, v, fps, px):
     
     return data_shifted
 
+def correlate_frames(data, step):
+    corr = np.zeros(data.shape)
+    for i in range(0,data.shape[1]-step):
+        corr[:,i] = np.correlate(data[:,i], data[:,i+step], "same")
+
+    return corr
