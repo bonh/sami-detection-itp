@@ -1,17 +1,6 @@
 import numpy as np
 from scipy.special import erf
 
-def shift_data(data, v, fps, px):
-    dx =  v/fps
-    data_shifted = np.zeros(data.shape)
-    for i in range(0, data.shape[1]):
-        shift = data.shape[0] - int(i*dx/px)%data.shape[0]
-        data_shifted[:,i] = np.roll(data[:,i], shift)
-    
-    #data_shifted = np.roll(data_shifted, int(data_shifted.shape[1]/2), axis=1)
-    
-    return data_shifted
-
 def skewNormal(x, t, v=1.0, sigma=1.0, alpha=0.0):
     '''
     Skew normal distribution.
