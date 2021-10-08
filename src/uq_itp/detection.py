@@ -31,7 +31,7 @@ def main(inname, channel, lagstep, frames):
         trace_mean = pm.sample(20000, return_inferencedata=True, cores=4)
     
     with bayesian.create_model_noiseonly(corr_mean) as model:
-        trace_noiseonly = pm.sample(10000, return_inferencedata=True)
+        trace_noiseonly = pm.sample(20000, return_inferencedata=True, cores=4)
         
     dfwaic = pm.compare({"sample":trace_mean, "noiseonly":trace_noiseonly}, ic="waic")
     dfloo = pm.compare({"sample":trace_mean, "noiseonly":trace_noiseonly}, ic="loo")
