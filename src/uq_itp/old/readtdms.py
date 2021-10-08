@@ -28,6 +28,9 @@ tdms_file = TdmsFile.read(inname)
 
 time = tdms_file.groups()[0].channels()[0]
 voltage = tdms_file.groups()[0].channels()[1]
+corr = tdms_file.groups()[0].channels()[2]
+
+plt.plot(time.data, corr);
 
 plt.plot(time.data, voltage);
 
