@@ -3,9 +3,6 @@ from nd2reader import ND2Reader
 
 def load_nd_data(inname, startframe=0, endframe=-1, verbose=False):
     with ND2Reader(inname) as rawimages:
-        rawimages.bundle_axes = 'yx' # defines which axes will be present in a single frame
-        rawimages.iter_axes = 't' # defines which axes will be the index axis; t-axis is the time axis
-    
         # determine metadata of the images
         height = rawimages.metadata["height"]
         width = rawimages.metadata["width"]
