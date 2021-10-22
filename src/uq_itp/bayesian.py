@@ -110,7 +110,9 @@ def Marginal_llk(mtrace, model=None, logp=None, maxiter=1000):
         samples_4_iter[varmap.slc, :] = x2.reshape((x2.shape[0], np.prod(x2.shape[1:], dtype=int))).T
         # effective sample size of samples_4_iter, scalar
         orig_name=recover_var_name(var.name)
-        neff_list.update(pm.stats.ess(mtrace[N1_:], var_names=[orig_name]))
+        tmp = az.from_pymc3(trace=mtrace[N1_:], model=model)
+        neff_list.update(az.ess(tmp, var_names=[orig_name]))
+        #neff_list.update(az.ess(mtrace[N1_:], var_names=[orig_name]))
     
     # median effective sample size (scalar)
     neff = np.median(list(neff_list.values()))  # FIXME: Crashes here because of shape sigma > 1!
