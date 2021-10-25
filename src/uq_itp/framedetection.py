@@ -25,6 +25,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import dataprep
 import utilities
+import bayesian
 from matplotlib.patches import Rectangle
 import arviz as az
 from sklearn import preprocessing
@@ -102,6 +103,90 @@ for i in range(len(axs)):
 
 plt.show()
 # -
+# To automize the frame detection, a Gaussian (signal model) is fitted to the correlation functions to determine whether there is a peak or not. Additionally, decision criterion is added by comparing the signal model with the noise-only model. The idea is, to keep frames, in which the signal model is more likely  to describe the data than the noise-only model. Additionally, a correlation between neighboring intervals is used, i.e. when the previous and the following interval are "informative" the tagged is also assumed to be "informative".
+
+# +
+lagstep = 1
+# each delta frames use nset to calculate the correlation function
+nset = 10
+delta = 20
+
+fig, axs = plt.subplots(nrows=8, ncols=2, figsize=(12,30))
+plt.subplots_adjust(wspace=0.3, hspace=0.4)
+axs = axs.flatten()
+keep = np.empty(len(axs), dtype=object)
+results = np.empty(len(axs), dtype=object)
+
+for i in range(len(axs)):
+    start = i*delta
+    
+    # calculate correlation function
+    corr = np.mean(dataprep.correlate_frames(data[:,start:start+nset], lagstep), axis=1)
+    corr = corr.reshape(-1,1)
+    
+    # normalize data
+    scale = preprocessing.StandardScaler().fit(corr)
+    cor_scaled = scale.transform(corr).reshape((1,-1))[0]
+    
+    # fit model
+    x = np.linspace(0, cor_scaled.shape[0], cor_scaled.shape[0])
+    with bayesian.create_signalmodel(cor_scaled, x) as model:
+        trace_mean = pm.sample(2000, return_inferencedata=True, cores=4)
+    with bayesian.create_model_noiseonly(cor_scaled) as model:
+        trace_noiseonly = pm.sample(2000, return_inferencedata=True, cores=4)
+    
+    # compare both models
+    dfwaic = pm.compare({"sample":trace_mean, "noiseonly":trace_noiseonly}, ic="waic")
+    results[i] = dfwaic
+    print(dfwaic)
+    az.plot_compare(dfwaic, insample_dev=False);
+    
+    summary_mean = az.summary(trace_mean, var_names=["amplitude", "centroid", "sigma", "baseline", "sigma_noise"])
+    map_estimate = summary_mean.loc[:, "mean"]
+    model_mean = bayesian.model_signal(map_estimate["amplitude"], map_estimate["centroid"],\
+                                       map_estimate["sigma"], map_estimate["baseline"], x)
+    
+    # decision criterion
+    keep[i] = dfwaic['waic']['noiseonly']+dfwaic['se']['noiseonly'] < dfwaic['waic']['sample']-dfwaic['se']['sample']
+    print(keep[i])
+    
+    # plot fit and data
+    axs[i].plot(cor_scaled, label='data')
+    axs[i].set_title('start frame = %s' %start)
+    axs[i].plot(x, model_mean, label="fit, mean", alpha=0.5)
+    
+    axs[i].legend()
+
+plt.show()
+
+# +
+for i,d in enumerate(results):
+    keep[i] = d['waic']['noiseonly']+d['se']['noiseonly'] < d['waic']['sample']-d['se']['sample']
+
+# check neighboring intervals - add correlation ...
+if np.all(keep==False):
+    keep.fill(True)
+else:
+    for i in range(len(keep)):
+        if i > 0 and i < len(keep)-2:
+            if keep[i-1] == True and keep[i+1] == True:
+                keep[i] = True
+                
+print(keep)
+
+# calculate frames to keep
+keep_frames = np.empty(data.shape[1], dtype=object)
+keep_frames.fill(False)
+
+for i,k in enumerate(keep):
+    keep_frames[int(i*20):int((i+1)*20)] = k
+    
+#print(keep_frames)
+minframe = np.min(np.where(keep_frames == True)[0])
+maxframe = np.max(np.where(keep_frames == True)[0])
+print('Frames to keep: %s - %s' %(minframe,maxframe))
+# -
+
 
 
 
