@@ -19,10 +19,6 @@
 
 # %load_ext autoreload
 # %autoreload 2
-# -
-
-# Questions: 
-# * We often record images in which the sample has not reached the measurement window yet. Basically, we record only noise. The more images with pure noise (so without sample) we include in our algorithm the worse the result. How can we decide if we should include a specific image or not? This question corresponds to the `startframe` and `endframe` variables below.
 
 # + tags=[]
 import numpy as np
