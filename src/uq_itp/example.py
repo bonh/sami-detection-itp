@@ -23,7 +23,6 @@
 
 # Questions: 
 # * We often record images in which the sample has not reached the measurement window yet. Basically, we record only noise. The more images with pure noise (so without sample) we include in our algorithm the worse the result. How can we decide if we should include a specific image or not? This question corresponds to the `startframe` and `endframe` variables below.
-# * To decide if a sample is present or not (detected yes/no?) we fit a signal model and a pure noise model and calcualte the waic (widely applicable information criterion). Is this a convincing and robust criterion for our decision?
 
 # + tags=[]
 import numpy as np
@@ -31,6 +30,7 @@ import matplotlib.pyplot as plt
 import dataprep
 import helper
 import utilities
+import bayesian
 from matplotlib.patches import Rectangle
 import arviz as az
 from sklearn import preprocessing
@@ -50,12 +50,18 @@ channel_lower = 27
 channel_upper = 27
 
 # to cut images to the one containing the sample
-startframe = 200
-endframe = 300
+startframe = 150
+endframe = 250
 
 # from experiment
 fps = 46 # frames per second (1/s)
 px = 1.6e-6 # size of pixel (m/px)
+
+# rope
+rope_sigma = (5,15)
+rope_velocity = (200,250)
+rope = {'sigma': [{'rope': rope_sigma}]
+        , 'velocity': [{'rope': rope_velocity}]}
 # -
 
 # At first, we perform raw data processing (load microscopy images, cut height of images to microchannel, substract mean background image). This results in a 4D data array (height, length, frame, intensity). This corresponds to step 1 in the flowsheet.
@@ -133,71 +139,29 @@ corr_mean[int(corr_mean.shape[0]/2)] = 0
 corr_mean = corr_mean[0:int(corr_mean.shape[0]/2)]
 
 x = x[0:int(corr_mean.shape[0])]
+# -
 
-corr_singleframe = corr[0:int(corr.shape[0]/2),time]
-
-# +
 scaler = preprocessing.MinMaxScaler().fit(corr_mean)
 corr_mean = scaler.transform(corr_mean).flatten()
 
-scaler = preprocessing.MinMaxScaler().fit(corr_singleframe.reshape(-1,1))
-corr_singleframe = scaler.transform(corr_singleframe.reshape(-1,1)).flatten()
-
-
-# -
-
 # To find the velocity of the sample we now fit a Gaussian function to the averaged cross correlation functions (we know from physics that the sample distribution in the channel should be similar to a Gaussian so the correlation should follow a Gaussian too).
 
-# +
-def model_signal(amp, cent, sig, baseline, x):
-    return amp*np.exp(-1*(cent - x)**2/2/sig**2) + baseline
-
-def create_signalmodel(data, x):
-    with pm.Model() as model:
-        # prior peak
-        amp = pm.HalfNormal('amplitude', 1)
-        cent = pm.Normal('centroid', 125, 50)
-        base = pm.Normal('baseline', 0, 0.5)
-        sig = pm.HalfNormal('sigma', 20)
-
-        # forward model signal
-        signal = pm.Deterministic('signal', model_signal(amp, cent, sig, base, x))
-
-        # prior noise
-        sigma_noise = pm.HalfNormal('sigma_noise', 0.1)
-
-        # likelihood
-        likelihood = pm.Normal('y', mu = signal, sd=sigma_noise, observed = data)
-        
-        # calculate the velocity and the signal-to-noise distributions from the uncertain parameters of the Gaussian
-        velocity = pm.Deterministic("velocity", cent*px/(lagstep/fps)*1e6)
-        snr = pm.Deterministic("snr", amp/sigma_noise)
-        
-        return model
-
-
-# -
-
 x *= -1
-models = []
-with create_signalmodel(corr_mean, x) as model:
-    trace_mean = pm.sample(10000, return_inferencedata=True, cores=4)
-    models.append(model)
-
-ppc = pm.sample_posterior_predictive(trace_mean, model=models[0])
-idata = az.from_pymc3(
-        posterior_predictive=ppc,
-        model=models[0]
-    )
+with bayesian.signalmodel_correlation(corr_mean, x, px, lagstep, fps) as model:
+    trace = pm.sample(return_inferencedata=False, cores=4, target_accept=0.9)
+      
+    ppc = pm.fast_sample_posterior_predictive(trace, model=model)
+    idata = az.from_pymc3(trace=trace, posterior_predictive=ppc, model=model) 
+    summary = az.summary(idata)
 
 # Now we can display the averaged cross correlation functions together with the Gaussian fit and the .95 credible interval.
 
 # + tags=[]
 hdi = az.hdi(idata.posterior_predictive, hdi_prob=.95)
 fig,axs = plt.subplots(1,1,sharex=True, figsize=(10,5))
-axs.plot(x, corr_mean, label="averaged", alpha=0.8, color="black")
-axs.plot(x, idata.posterior_predictive.mean(("chain", "draw"))["y"], color="red", label="fit")
-axs.fill_between(x, hdi["y"][:,0], hdi["y"][:,1], alpha=0.2, color="blue", label=".95 HDI")
+axs.plot(-x, corr_mean, label="averaged", alpha=0.8, color="black")
+axs.plot(-x, idata.posterior_predictive.mean(("chain", "draw"))["y"], color="red", label="fit")
+axs.fill_between(-x, hdi["y"][:,0], hdi["y"][:,1], alpha=0.2, color="blue", label=".95 HDI")
 axs.legend();
 axs.set_xlabel("lag (px)")
 axs.set_ylabel("intensity (AU)");
@@ -205,17 +169,14 @@ axs.set_ylabel("intensity (AU)");
 
 # Futhermore, let's have a look at the velocity and the signal-to-noise ratio calculated from the posterior distribution. The HDI interval of the velocity is narrow and centered around a physical reasonable value, and the snr is always greater than one. Taking both factors into mind we conclude that there might be a sample inside the channel and the estimated mean velocity is an accurate value (you can do the same analysis using a no-sample image). Therefore we continue the analysis.
 
-summary_mean = az.summary(trace_mean, var_names=["amplitude", "centroid", "sigma", "baseline", "sigma_noise","velocity", "snr"])
+az.plot_posterior(idata, var_names=["sigma", "velocity", "snr"], rope=rope, hdi_prob=.95);
 
-axs = az.plot_posterior(trace_mean, var_names=["velocity", "snr"], figsize=(6,3));
-axs[0].set_title("")
-axs[1].set_title("")
-axs[0].set_xlabel("v ($\mu m/s$)")
-axs[1].set_xlabel("snr")
+detected = (bayesian.check_rope(idata.posterior["sigma"], rope_sigma) > .95) and (bayesian.check_rope(idata.posterior["velocity"], rope_velocity) > .95)
+print("Sample detected: {}".format(detected))
 
 # Next, we use the resulting mean of the velocity distribution to perform the Gallilei transformation.
 
-v = summary_mean["mean"]["velocity"]*1e-6
+v = summary["mean"]["velocity"]*1e-6
 print("Mean velocity of the sample is v = {} $mum /s$.".format(v*1e6))
 
 data_shifted = dataprep.shift_data(data, v, fps, px)
@@ -238,19 +199,15 @@ scaler = preprocessing.MinMaxScaler().fit(data_mean)
 data_mean = scaler.transform(data_mean).flatten()
 # -
 
-# Again, we fit a Gaussian function to the intensity.
+# Now we fit a skewed Gaussian function to the intensity.
 
 x = np.linspace(0, len(data_mean), len(data_mean))
-model_wsignal = None
-with create_signalmodel(data_mean, x) as model:
-    trace_mean = pm.sample(10000, return_inferencedata=False, cores=4)
-    model_wsignal = model
-
-ppc = pm.sample_posterior_predictive(trace_mean, model=model_wsignal)
-idata = az.from_pymc3(
-        posterior_predictive=ppc,
-        model=models[0]
-    )
+with bayesian.signalmodel(data_mean, x) as model:
+    trace = pm.sample(return_inferencedata=False, cores=4, target_accept=0.9)
+      
+    ppc = pm.fast_sample_posterior_predictive(trace, model=model)
+    idata = az.from_pymc3(trace=trace, posterior_predictive=ppc, model=model) 
+    summary = az.summary(idata)
 
 # And display the fit together with the averaged intensity data and the .95 HDI.
 
@@ -265,48 +222,8 @@ axs.set_ylabel("intensity (AU)");
 
 # Furthermore, let's have a look at the snr:
 
-ax = az.plot_posterior(trace_mean, var_names=["snr"], figsize=(6,3));
-ax.set_title("")
-ax.set_xlabel("snr")
-
+ax = az.plot_posterior(idata, var_names=["snr"], figsize=(6,3));
 
 # Note that our calculation of the snr includes the uncertainty of the data and the estimation. The HDI of the estimated signal-to-noise ratio is between 9 and 11, which is enough to conclude that a sample is present. 
-
-# We now include a Bayesian hypothesis test or model comparison to derive at a conclusion for "sample present/not present". Therefore, we fit a noise-only model to the data too and compare the results using the Widely-applicable Information Criterion.
-
-# +
-def create_model_noiseonly(data):
-    model = pm.Model()
-    with model:
-        # baseline only
-        base = pm.Normal('baseline', 0, 0.5)
-
-        # prior noise
-        sigma_noise = pm.HalfNormal('sigma_noise', 0.1)
-
-        # likelihood
-        likelihood = pm.Normal('y', mu = base, sd=sigma_noise, observed = data)
-
-        return model
-    
-model_noise = None
-with create_model_noiseonly(data_mean) as model:
-    trace_noiseonly = pm.sample(10000, return_inferencedata=False, cores=4)
-    model_noise = model
-# -
-
-dfwaic = pm.compare({"sample":trace_mean, "noiseonly":trace_noiseonly}, ic="loo")
-print(dfwaic)
-az.plot_compare(dfwaic, insample_dev=False);
-
-# Furthermore, we calculate the Bayes factor using bridge sampling:
-
-# +
-import bayesian
-ml_noiseonly = bayesian.Marginal_llk(trace_noiseonly, model_noise)
-ml_signal = bayesian.Marginal_llk(trace_mean, model_wsignal)
-
-print("Bayes factor: {}".format(np.exp(ml_signal["logml"]-ml_noiseonly["logml"])))
-# -
 
 # As a final result, we can be very certain that a sample is present.
