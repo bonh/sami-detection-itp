@@ -14,6 +14,7 @@
 #     name: python3
 # ---
 
+# +
 import helper
 import dataprep
 import numpy as np
@@ -22,9 +23,12 @@ import matplotlib.pyplot as plt
 import pymc3 as pm
 import arviz as az
 from PIL import Image
+ 
+import theano
+import theano.tensor as tt
 
 # +
-inname_base = "/home/cb51neqa/projects/itp/exp_data/ITP_AF647_5µA/AF_0.1ng_l/"
+inname_base = "/home/cb51neqa/projects/itp/exp_data/ITP_AF647_5µA/AF_10ng_l/"
 
 channel_lower = 27
 channel_upper = 27
@@ -73,42 +77,47 @@ def signalmodel(data, x):
     with pm.Model() as model:
         # background
         # f = b*x + c
+        #aa = pm.Normal("a", 0, 0.0001)
         b = pm.Normal('b', 0, 1)
         c = pm.Normal('c', 0, 1)
-
+        
         background = pm.Deterministic("background", b*x+c)
 
-        # peak
+        # sample peak
         amp = pm.Uniform('amplitude', 0, 2) 
         cent = pm.Uniform('centroid', 0, len(data))
         sig = pm.Uniform('sigma', 0, 100) # TODO: calculate from physics?
+        #alpha = pm.Normal("alpha", 0, 0.1)
 
-        def model_signal(amp, cent, sig, x):
-            return amp*np.exp(-1*(cent - x)**2/2/sig**2)
-
-        # signal
-        signal = pm.Deterministic('signal', model_signal(amp, cent, sig, x))
+        def sample(amp, cent, sig, x):
+            #return amp*tt.exp(-(cent - x)**2/2/sig**2)        
+            return amp*tt.exp(-(cent - x)**2/2/sig**2) #* (1-tt.erf((alpha*(cent - x))/tt.sqrt(2)/sig))
+        
+        sample = pm.Deterministic("sample", sample(amp, cent, sig, x))
+        
+        # background + sample
+        signal = pm.Deterministic('signal', background + sample)
 
         # prior noise
         sigma_noise = pm.HalfNormal('sigma_noise', 1) # TODO: can we estimate a prior value from zero concentration images?
 
         # likelihood       
-        likelihood = pm.Normal('y', mu = background+signal, sd=sigma_noise, observed = data)
+        likelihood = pm.Normal('y', mu = signal, sd=sigma_noise, observed = data)
         
         # derived quantities
         velocity = pm.Deterministic("velocity", (len(data)-cent)*px/(lagstep/fps)*1e6)
         snr = pm.Deterministic("snr", amp/sigma_noise)
 
         # sample the model
-        tracesignal = pm.sample(15000, return_inferencedata=False, cores=4)
+        tracesignal = pm.sample(10000, tune=10000, return_inferencedata=False, cores=4)
         modelsignal = model
         
         return modelsignal, tracesignal
 
 
-x = np.linspace(0, len(corr_mean), len(corr_mean))
 for number in [1]:
     corr_mean = raw2corrmean(number)
+    x = np.linspace(0, len(corr_mean), len(corr_mean))
     
     modelsignal, tracesignal = signalmodel(corr_mean, x)
 
@@ -124,7 +133,7 @@ axs.set_ylabel("intensity (AU)");
 
 az.summary(idata, var_names=["snr", "sigma_noise", "amplitude", "sigma", "velocity", "centroid", "b", "c"])
 
-az.plot_posterior(idata, var_names=["sigma", "velocity"], rope=rope, hdi_prob=.95);
+az.plot_posterior(idata, var_names=["sigma", "velocity", "snr"], rope=rope, hdi_prob=.95);
 
 hdi = az.hdi(idata.posterior, hdi_prob=.95, var_names=["sigma", "velocity"])
 hdi_sigma = hdi["sigma"].data
@@ -139,5 +148,9 @@ values = idata.posterior["velocity"]
 vals = rope_velocity
 prob = ((values > vals[0]) & (values <= vals[1])).mean()
 prob.data
+
+
+
+pm.model_to_graphviz(modelsignal)
 
 

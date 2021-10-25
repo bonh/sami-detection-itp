@@ -15,6 +15,44 @@ import warnings
 def model_signal(amp, cent, sig, baseline, x):
     return amp*np.exp(-1*(cent - x)**2/2/sig**2) + baseline
 
+def check_rope(values, rope):
+    prob = ((values > rope[0]) & (values <= rope[1])).mean()
+    return prob.data
+
+def fit_crosscorrelationmodel(data, x, px, lagstep, fps):
+    with pm.Model() as model:
+        # background, f = b*x + c
+        b = pm.Normal('b', 0, 1)
+        c = pm.Normal('c', 0, 1)
+        
+        background = pm.Deterministic("background", b*x+c)
+
+        # signalpeak
+        amp = pm.Uniform('amplitude', 0, 2) 
+        cent = pm.Uniform('centroid', 0, len(data))
+        sig = pm.Uniform('sigma', 0, 100) # TODO: calculate from physics?
+
+        # Gaussian
+        def model_signal(amp, cent, sig, x):
+            return amp*np.exp(-1*(cent - x)**2/2/sig**2)
+
+        signal = pm.Deterministic('signal', model_signal(amp, cent, sig, x))
+
+        # noise
+        sigma_noise = pm.HalfNormal('sigma_noise', 1) # TODO: can we estimate a prior value from zero concentration images?
+
+        # likelihood       
+        likelihood = pm.Normal('y', mu = background+signal, sd=sigma_noise, observed = data)
+        
+        # derived quantities
+        velocity = pm.Deterministic("velocity", (len(data)-cent)*px/(lagstep/fps)*1e6)
+        snr = pm.Deterministic("snr", amp/sigma_noise)
+
+        # sample the model
+        trace = pm.sample(3000, tune=2000, return_inferencedata=False, cores=4)
+        
+        return model, trace
+
 def create_signalmodel(data, x):
     with pm.Model() as model:
         # prior peak

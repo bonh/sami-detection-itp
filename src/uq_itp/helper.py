@@ -24,6 +24,7 @@ def raw2widthaverage(inname, channel):
 
 def raw2images(inname, channel, background=None):
     data_raw = dataprep.load_nd_data(inname, verbose=False)
+    print(data_raw.shape)
     data_raw = dataprep.cuttochannel(data_raw, channel[0], channel[1])
     background = np.mean(data_raw[:,:,0:50], axis=2)
     return dataprep.substractbackground(data_raw, background)
