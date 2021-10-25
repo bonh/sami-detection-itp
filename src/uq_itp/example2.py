@@ -27,8 +27,10 @@ from PIL import Image
 import theano
 import theano.tensor as tt
 
+import bayesian
+
 # +
-inname_base = "/home/cb51neqa/projects/itp/exp_data/ITP_AF647_5µA/AF_10ng_l/"
+inname_base = "/home/cb51neqa/projects/itp/exp_data/ITP_AF647_5µA/AF_0.1ng_l/"
 
 channel_lower = 27
 channel_upper = 27
@@ -109,7 +111,7 @@ def signalmodel(data, x):
         snr = pm.Deterministic("snr", amp/sigma_noise)
 
         # sample the model
-        tracesignal = pm.sample(10000, tune=10000, return_inferencedata=False, cores=4)
+        tracesignal = pm.sample(return_inferencedata=False, cores=4, target_accept=0.9)
         modelsignal = model
         
         return modelsignal, tracesignal
@@ -135,19 +137,9 @@ az.summary(idata, var_names=["snr", "sigma_noise", "amplitude", "sigma", "veloci
 
 az.plot_posterior(idata, var_names=["sigma", "velocity", "snr"], rope=rope, hdi_prob=.95);
 
-hdi = az.hdi(idata.posterior, hdi_prob=.95, var_names=["sigma", "velocity"])
-hdi_sigma = hdi["sigma"].data
-hdi_velocity = hdi["velocity"].data
+bayesian.check_rope(idata.posterior["sigma"], rope_sigma) > .95
 
-values = idata.posterior["sigma"]
-vals = rope_sigma
-prob = ((values > vals[0]) & (values <= vals[1])).mean()
-prob.data
-
-values = idata.posterior["velocity"]
-vals = rope_velocity
-prob = ((values > vals[0]) & (values <= vals[1])).mean()
-prob.data
+bayesian.check_rope(idata.posterior["velocity"], rope_velocity) > .95
 
 
 
