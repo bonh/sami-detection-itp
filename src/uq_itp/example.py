@@ -17,6 +17,24 @@
 # todo:
 # * include (semi-)automatic endframe and startframe decision
 
+# #### Steps:
+# 0. Required input:
+#     * Define the ROPEs (region of practical equivalence) around the Null hypothesis for the spread of the sample distribution and the sample velocity. 
+#     * Define position of the channel in the images.
+#     * Define start and end frames for the averages (see todo above!).
+#     * Define fps and resolution.
+# 1. Load microscopy images, cut height of images to microchannel, and substract mean background image -> results in a 4-tuple (height, length, frame, intensity).
+# 2. Average the intensity of the 4-tuple from step 1 over the height of the image -> results in a 3-tuple (length, frame, averaged intensity).
+# 3. Calculate cross correlation between frame $n$ and frame $n+L$ -> results in a 3-tuple (lag, frame, correlated intensity).
+# 4. Average the correlated intensity of the 3-tuple from step 3 over all the frames -> results in a 2-tuple (lag, averaged correlated intensity).
+# 5. Fit a Gaussian function (defined as a Bayesian model) to the averaged correlated intensity of the 2-tuple from step 4.
+# 6. Calculate the distribution of the sample velocity from the posterior of the centroid of the Gaussian estimated in step 9, the lag from step 3.
+# 6. Test if more than 95 % of the marginal posteriors of the spread and velocity calculated in step 5 are inside the ROPEs -> Detected (yes/no)?
+# 7. If a sample is detected, use the mean of the velocity distribution calculated in step 4 to perform the Gallilei transformation of the original 3-tuple from step 2 -> (length; frame; shifted, averaged intensity).
+# 8. Average the shifted and height averaged intensity of the 3-tuple from step 7 over all frames -> results in a 2-tuple (length; averaged, shifted, averaged intensity).
+# 9. Fit a skewed Gaussian function (defined as a Bayesian model) to the frame averaged, shifted, height averaged intensity of the 2-tuple from step 8.
+# 10. Calculate the distribution of the signal-to-noise ratio from the posterior of the amplitude and the noise standard deviation estimated in step 9.
+
 # +
 # %matplotlib inline
 
@@ -51,7 +69,7 @@ mpl.rcParams['text.latex.preamble'] = r'\usepackage{mathtools}'
 plt.style.use(['science', 'vibrant'])
 
 # +
-inname = "/home/cb51neqa/projects/itp/exp_data/ITP_AF647_5µA/AF_0.1ng_l/003.nd2"
+inname = "/home/cb51neqa/projects/itp/exp_data/ITP_AF647_5µA/AF_0.1ng_l/002.nd2"
 
 # to cut images to channel
 channel_lower = 27
@@ -72,7 +90,7 @@ rope = {'sigma': [{'rope': rope_sigma}]
         , 'velocity': [{'rope': rope_velocity}]}
 # -
 
-# At first, we perform raw data processing (load microscopy images, cut height of images to microchannel, substract mean background image). This results in a 4-tupel (height, length, frame, intensity). This corresponds to step 1 in the flowsheet.
+# At first, we perform raw data processing (load microscopy images, cut height of images to microchannel, substract mean background image). This results in a 4-tuple (height, length, frame, intensity). This corresponds to step 1 in the flowsheet.
 
 # + tags=[]
 data_raw = helper.raw2images(inname, (channel_lower, channel_upper))
@@ -105,7 +123,7 @@ fig.tight_layout()
 ani
 # -
 
-# Observe that the sample is almost perfectly rectangular (or constant over the image height). So we can reduce noise already by averaging the signal over the height of the image (step 2). This results in a 3-tupel (length, frame, intensity).
+# Observe that the sample is almost perfectly rectangular (or constant over the image height). So we can reduce noise already by averaging the signal over the height of the image (step 2). This results in a 3-tuple (length, frame, intensity).
 
 tmp = dataprep.averageoverheight(data_raw)
 
@@ -139,7 +157,7 @@ fig.align_ylabels()
 set_size(6,4)
 fig.savefig("step2.pdf", bbox_inches='tight')
 
-# Observe that the sample moves through the channel with an (almost) constant velocity. However, we do not know this velocity, esspecially for low concentrations. But due to the velocity being constant, the cross-correlation between every frame $n$ and $n+L$, where $L$ is some specified lag, should be almost identical (up to the random noise of course). This calculation of the single cross correlation functions (step 3) and the subsequent averaging (step 4) results in a 2-tupel (lag, correlated intensity) .
+# Observe that the sample moves through the channel with an (almost) constant velocity. However, we do not know this velocity, esspecially for low concentrations. But due to the velocity being constant, the cross-correlation between every frame $n$ and $n+L$, where $L$ is some specified lag, should be almost identical (up to the random noise of course). This calculation of the single cross correlation functions (step 3) and the subsequent averaging (step 4) results in a 2-tuple (lag, correlated intensity).
 
 lagstep = 30 
 corr = dataprep.correlate_frames(data, lagstep)
@@ -179,7 +197,7 @@ fig.align_ylabels()
 set_size(6,6)
 fig.savefig("step34.pdf", bbox_inches='tight')
 
-# Based on this 2-tupel we decide if a sample is present or not. Therefore we fit a (skewed) Gaussian function to the averaged cross correlation functions (step 5). (Note, that the cross correlation of a skewed Gaussian with a shifted skewed Gaussian is a Gaussian(?).)
+# Based on this 2-tuple we decide if a sample is present or not. Therefore we fit a Gaussian function to the averaged cross correlation functions (step 5). (Note, that the cross correlation of a skewed Gaussian with a shifted skewed Gaussian is a Gaussian(?).)
 
 with bayesian.signalmodel_correlation(corr_mean, -x_lag, px, lagstep, fps) as model:
     trace = pm.sample(return_inferencedata=False, cores=4, target_accept=0.9)
@@ -213,7 +231,7 @@ plt.savefig("step6.pdf", bbox_inches='tight');
 detected = (bayesian.check_rope(idata.posterior["sigma"], rope_sigma) > .95) and (bayesian.check_rope(idata.posterior["velocity"], rope_velocity) > .95)
 print("Sample detected: {}".format(detected))
 
-# If we decide that a sample is present we can use the resulting mean of the velocity distribution to perform the Gallilei transformation of the original 3-tupel (length, frame, intensity) (step 7) and average over all frames (step 8). This results again in a 2-tuple (length, averaged intensity). We fit a skewed Gaussian to the averaged intensit (step 9).
+# If we decide that a sample is present we can use the resulting mean of the velocity distribution to perform the Gallilei transformation of the original 3-tuple (length, frame, intensity) (step 7) and average over all frames (step 8). This results again in a 2-tuple (length, averaged intensity). We fit a skewed Gaussian to the averaged intensit (step 9).
 
 v = summary["mean"]["velocity"]*1e-6
 print("Mean velocity of the sample is v = {} $mum /s$.".format(v*1e6))
@@ -252,28 +270,13 @@ set_size(6,4)
 fig.savefig("step789.pdf", bbox_inches='tight')
 # -
 
-# Finally, we can examine the marginal posterior of the signal-to-noise ratio calculated from the amplitude and the noise standard deviation.
+# Finally, we can examine the full distribution including all the uncertainty of the signal-to-noise ratio calculated from the amplitude and the noise standard deviation (step 10).
 
-# +
-
-axs = az.plot_posterior(idata, var_names=["sigma", "velocity"], rope=rope, kind="hist", point_estimate='mean', hdi_prob="hide");
-axs[0].set_title("")
-axs[1].set_title("")
-axs[0].set_xlabel("$\sigma$")
-axs[1].set_xlabel("$v$");
-plt.savefig("step6.pdf", bbox_inches='tight');
-# -
-
-# Note that our calculation of the snr includes the uncertainty of the data and the estimation. The HDI of the estimated signal-to-noise ratio is between 9 and 11, which is enough to conclude that a sample is present. 
-
-# As a final result, we can be very certain that a sample is present.
+ax = az.plot_posterior(idata, var_names=["snr"], rope=rope, kind="hist", point_estimate='mean', hdi_prob="hide");
+ax.set_title("")
+ax.set_xlabel("$snr$")
+plt.savefig("step10.pdf", bbox_inches='tight');
 
 
 
 
-
-
-
-#  If we would know this velocity we could shift the samples in the different frames to be perfectly aligned (Galilean transformation, corresponds to a rotation of the image above). If the frames are aligned we would be able to average over all frames and reduce the noise. This results in a 2D data array (length, intensity).
-#  
-#  Obtaining this velocity is critically and difficult, esspecially for very small concentrations. Therefore, w
