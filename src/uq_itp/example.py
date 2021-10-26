@@ -19,7 +19,7 @@
 
 # #### Steps:
 # 0. Required input:
-#     * Define the ROPEs (region of practical equivalence) around the Null hypothesis for the spread of the sample distribution and the sample velocity. 
+#     * Define the ROPEs (region of practical equivalence) around the Null hypothesis for the spread of the sample distribution and the sample velocity (depends on Physics). 
 #     * Define position of the channel in the images.
 #     * Define start and end frames for the averages (see todo above!).
 #     * Define frames-per-second (fps) and resolution (px).
@@ -84,8 +84,8 @@ fps = 46 # frames per second (1/s)
 px = 1.6e-6 # size of pixel (m/px)
 
 # rope
-rope_sigma = (5,15)
-rope_velocity = (200,250)
+rope_sigma = (7,12)
+rope_velocity = (210,230)
 rope = {'sigma': [{'rope': rope_sigma}]
         , 'velocity': [{'rope': rope_velocity}]}
 # -
@@ -276,7 +276,3 @@ ax = az.plot_posterior(idata, var_names=["snr"], rope=rope, kind="hist", point_e
 ax.set_title("")
 ax.set_xlabel("$snr$")
 plt.savefig("step10.pdf", bbox_inches='tight');
-
-
-
-

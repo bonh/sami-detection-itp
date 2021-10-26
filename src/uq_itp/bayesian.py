@@ -63,7 +63,7 @@ def signalmodel(data, x):
         # background
         # f = b*x + c
         #aa = pm.Normal("a", 0, 0.0001)
-        b = pm.Normal('b', 0, 1)
+        b = pm.Normal('b', 0, 0.1)
         c = pm.Normal('c', 0, 1)
         
         background = pm.Deterministic("background", b*x+c)
@@ -72,7 +72,7 @@ def signalmodel(data, x):
         amp = pm.Uniform('amplitude', 0, 2) 
         cent = pm.Uniform('centroid', 0, len(data))
         sig = pm.Uniform('sigma', 0, 100) # TODO: calculate from physics?
-        alpha = pm.Normal("alpha", 0, 0.1)
+        alpha = pm.Normal("alpha", 0, 0.01)
 
         def sample(amp, cent, sig, x):       
             return amp*tt.exp(-(cent - x)**2/2/sig**2) * (1-tt.erf((alpha*(cent - x))/tt.sqrt(2)/sig))
