@@ -22,18 +22,18 @@
 #     * Define the ROPEs (region of practical equivalence) around the Null hypothesis for the spread of the sample distribution and the sample velocity. 
 #     * Define position of the channel in the images.
 #     * Define start and end frames for the averages (see todo above!).
-#     * Define fps and resolution.
+#     * Define frames-per-second (fps) and resolution (px).
 # 1. Load microscopy images, cut height of images to microchannel, and substract mean background image -> results in a 4-tuple (height, length, frame, intensity).
 # 2. Average the intensity of the 4-tuple from step 1 over the height of the image -> results in a 3-tuple (length, frame, averaged intensity).
 # 3. Calculate cross correlation between frame $n$ and frame $n+L$ -> results in a 3-tuple (lag, frame, correlated intensity).
 # 4. Average the correlated intensity of the 3-tuple from step 3 over all the frames -> results in a 2-tuple (lag, averaged correlated intensity).
 # 5. Fit a Gaussian function (defined as a Bayesian model) to the averaged correlated intensity of the 2-tuple from step 4.
-# 6. Calculate the distribution of the sample velocity from the posterior of the centroid of the Gaussian estimated in step 9, the lag from step 3.
-# 6. Test if more than 95 % of the marginal posteriors of the spread and velocity calculated in step 5 are inside the ROPEs -> Detected (yes/no)?
-# 7. If a sample is detected, use the mean of the velocity distribution calculated in step 4 to perform the Gallilei transformation of the original 3-tuple from step 2 -> (length; frame; shifted, averaged intensity).
-# 8. Average the shifted and height averaged intensity of the 3-tuple from step 7 over all frames -> results in a 2-tuple (length; averaged, shifted, averaged intensity).
-# 9. Fit a skewed Gaussian function (defined as a Bayesian model) to the frame averaged, shifted, height averaged intensity of the 2-tuple from step 8.
-# 10. Calculate the distribution of the signal-to-noise ratio from the posterior of the amplitude and the noise standard deviation estimated in step 9.
+# 6. Calculate the distribution of the sample velocity from the posterior of the centroid of the Gaussian estimated in step 9, the lag from step 3 as well as the fps and px.
+# 7. Test if more than 95 % of the marginal posteriors of the spread and velocity calculated in step 5 are inside the ROPEs -> Detected (yes/no)?
+# 8. If a sample is detected, use the mean of the velocity distribution calculated in step 4 to perform the Gallilei transformation of the original 3-tuple from step 2 -> (length; frame; shifted, averaged intensity).
+# 9. Average the shifted and height averaged intensity of the 3-tuple from step 7 over all frames -> results in a 2-tuple (length; averaged, shifted, averaged intensity).
+# 10. Fit a skewed Gaussian function (defined as a Bayesian model) to the frame averaged, shifted, height averaged intensity of the 2-tuple from step 8.
+# 11. Calculate the distribution of the signal-to-noise ratio from the posterior of the amplitude and the noise standard deviation estimated in step 9.
 
 # +
 # %matplotlib inline
