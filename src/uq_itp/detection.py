@@ -16,27 +16,32 @@ def main(inname, channel, lagstep, frames, px, fps, rope_sigma, rope_velocity):
     corr = dataprep.correlate_frames(data, lagstep)
     
     corr_mean = np.mean(corr[:,frames[0]:frames[1]], axis=1).reshape(-1, 1)
+    x_lag = np.linspace(-corr_mean.shape[0]/2, corr_mean.shape[0]/2, corr_mean.shape[0])
     
     #corr_mean[int(corr_mean.shape[0]/2)] = 0
     corr_mean = corr_mean[0:int(corr_mean.shape[0]/2)]
-    
+    x_lag = x_lag[0:int(corr_mean.shape[0])]
+
     scaler = preprocessing.MinMaxScaler().fit(corr_mean)
     corr_mean = scaler.transform(corr_mean).flatten()
     
-    x = np.linspace(0, len(corr_mean), len(corr_mean))
-    model, trace = bayesian.fit_crosscorrelationmodel(corr_mean, x, px, lagstep, fps)
-    
-    idata = az.from_pymc3(trace=trace, model=model) 
-    detected = bayesian.check_rope(idata.posterior["sigma"], rope_sigma) > .95 and bayesian.check_rope(idata.posterior["velocity"], rope_velocity) > .95
-    
+    with bayesian.signalmodel_correlation(corr_mean, -x_lag, px, lagstep, fps) as model:
+        trace = pm.sample(return_inferencedata=False, cores=4, target_accept=0.9)
+        idata = az.from_pymc3(trace=trace, model=model) 
+
+    detected = (bayesian.check_rope(idata.posterior["sigma"], rope_sigma) > .95) and (bayesian.check_rope(idata.posterior["velocity"], rope_velocity) > .95)
+    print("Sample detected: {}".format(detected))
+
     return detected.astype(int), idata
     
 if __name__ == "__main__":
     # same for every experiment
     fps = 46 # frames per second (1/s)
     px = 1.6e-6# size of pixel (m/px)  
-    rope_sigma = (5,15)
-    rope_velocity = (200,250)
+
+    rope_sigma = (7,12)
+    rope_velocity = (210,230)
+
     channel = [27, 27]
     lagstep = 30
     
