@@ -7,9 +7,9 @@
 #       extension: .py
 #       format_name: light
 #       format_version: '1.5'
-#       jupytext_version: 1.10.2
+#       jupytext_version: 1.12.0
 #   kernelspec:
-#     display_name: Python 3
+#     display_name: Python 3 (ipykernel)
 #     language: python
 #     name: python3
 # ---
@@ -36,7 +36,7 @@ from IPython.display import HTML
 # IDEA: Use the correlation function of the frames to decide which frame might contain relevant data and which not. This is necessary to reduce the number of frames that only contain noise which would increase the detection rate/snr.
 
 # +
-inname = "../../../../03_data/ITP_AF647_5µA/AF_0.1ng_l/001.nd2"
+inname = "/home/cb51neqa/projects/itp/exp_data/ITP_AF647_5µA/AF_0.1ng_l/002.nd2"
 
 # to cut images to channel
 channel_lower = 27
@@ -76,7 +76,93 @@ axs[0].set_ylabel("intensity (AU)");
 axs[1].imshow(data.T, aspect="auto", origin="lower", extent=(0, length*px*1e3, 0, nframes))
 axs[1].set_xlabel("length (mm)")
 axs[1].set_ylabel("frame (-)");
+axs[1].tick_params(labeltop=True, labelright=True)
 
+# +
+lagstep = 30
+corr = dataprep.correlate_frames(data, lagstep)
+
+scaler = preprocessing.StandardScaler().fit(corr)
+corr = scaler.transform(corr)
+
+plt.imshow(corr[0:int(corr.shape[0]/2),:].T, aspect="auto", origin="lower", extent=[x_lag[0],x_lag[-1],0,corr.T.shape[1]])
+
+# +
+corr_mean = np.mean(corr[:,100:300], axis=1)
+
+#corr_mean[int(corr_mean.shape[0]/2)] = 0
+# velocity > 0
+corr_mean = corr_mean[0:int(corr_mean.shape[0]/2)]
+
+plt.plot(corr_mean)
+
+# +
+rope_sigma = (7,12)
+rope_velocity = (210,230)
+
+lagstep = 30
+corr = dataprep.correlate_frames(data, lagstep)
+
+scaler = preprocessing.StandardScaler().fit(corr)
+corr = scaler.transform(corr)
+
+i = 0
+step = 50
+startframe = 100
+endframe = 300
+
+n = int((endframe-startframe)/step) 
+fig, axs = plt.subplots(n,1, figsize=(10,2*n))
+
+detected = False
+i = 0
+corr_mean_before = 0
+corr_total_steps = 0
+intervals = []
+while not detected and i<n:
+    start = startframe+i*step
+    end = start+step
+    if end > endframe:
+        break
+        
+    indices = np.array(np.r_[start:end])
+    for interval in intervals:
+        indices = np.concatenate((indices, np.r_[interval[0]:interval[1]]))
+        
+    tmp = np.mean(corr[:,indices], axis=1).reshape(-1,1)
+    
+    x_lag = np.linspace(-tmp.shape[0]/2, tmp.shape[0]/2, tmp.shape[0])
+    x_lag = x_lag[0:int(tmp.shape[0]/2)]
+    
+    tmp[int(tmp.shape[0]/2)] = 0
+    tmp = tmp[0:int(tmp.shape[0]/2)]
+    
+    scaler = preprocessing.MinMaxScaler().fit(tmp)
+    tmp = scaler.transform(tmp).flatten()
+
+    with bayesian.signalmodel_correlation(tmp, -x_lag, px, lagstep, fps) as model:
+        trace = pm.sample(return_inferencedata=False, cores=4, target_accept=0.9)
+        idata = az.from_pymc3(trace=trace, model=model) 
+
+    detected = (bayesian.check_rope(idata.posterior["sigma"], rope_sigma) > .95) \
+        and (bayesian.check_rope(idata.posterior["velocity"], rope_velocity) > .95)
+    print("Sample detected: {}".format(detected))
+
+    if (bayesian.check_rope(idata.posterior["sigma"], rope_sigma) > .70) \
+        and (bayesian.check_rope(idata.posterior["velocity"], rope_velocity) > .70):
+        print("Update frames included in detection")
+        intervals.append((start, end))
+
+    print(intervals)
+    
+    axs[i].plot(tmp)
+
+    i+=1
+    
+fig.tight_layout()
+
+
+# -
 
 # Now, the data is pre-processed but it still contains frames with noise only. Here, we define a criterium that allows to decide which frames are relevant and which not. This is based on the cross-correlation function of the data.
 
