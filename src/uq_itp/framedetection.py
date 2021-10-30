@@ -36,7 +36,7 @@ from IPython.display import HTML
 # IDEA: Use the correlation function of the frames to decide which frame might contain relevant data and which not. This is necessary to reduce the number of frames that only contain noise which would increase the detection rate/snr.
 
 # +
-inname = "/home/cb51neqa/projects/itp/exp_data/ITP_AF647_5µA/AF_0.1ng_l/002.nd2"
+inname = "/home/cb51neqa/projects/itp/exp_data/ITP_AF647_5µA/AF_0.1ng_l/005.nd2"
 
 # to cut images to channel
 channel_lower = 27
@@ -62,6 +62,10 @@ nframes = data_raw.shape[2]
 print("height = {}, length = {}, nframes = {}".format(height, length, nframes))
 
 tmp = dataprep.averageoverheight(data_raw)
+
+# +
+#tmp = ndimage.uniform_filter1d(tmp, 20, 0)
+# -
 
 scaler = preprocessing.StandardScaler().fit(tmp)
 data = scaler.transform(tmp)
