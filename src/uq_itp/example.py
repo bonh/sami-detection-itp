@@ -84,8 +84,9 @@ fps = 46 # frames per second (1/s)
 px = 1.6e-6 # size of pixel (m/px)
 
 # rope
-rope_sigma = (7,12)
-rope_velocity = (210,230)
+sigma_mean = 10
+rope_sigma = (5,15)
+rope_velocity = (200,250)
 rope = {'sigma': [{'rope': rope_sigma}]
         , 'velocity': [{'rope': rope_velocity}]}
 # -
@@ -204,7 +205,9 @@ with bayesian.signalmodel_correlation(corr_mean, -x_lag, px, lagstep, fps) as mo
       
     ppc = pm.fast_sample_posterior_predictive(trace, model=model)
     idata = az.from_pymc3(trace=trace, posterior_predictive=ppc, model=model) 
-    summary = az.summary(idata)
+    summary = az.summary(idata, var_names=["sigma_noise", "sigma", "centroid", "amplitude", "c", "b"])
+
+summary
 
 # + tags=[]
 hdi = az.hdi(idata.posterior_predictive, hdi_prob=.95)
@@ -221,7 +224,7 @@ fig.savefig("step5.pdf", bbox_inches='tight');
 
 # To decide if a sample is present we define a ROPE (region of practical equivalence) around the Null hypothesis for the spread of the Gaussian fit as well as the velocity calculated from the maximum of the Gaussian function. The more tight the ROPEs the more accurate the estimation has to be (we are more certain). If more than 95 % of the marginal posteriors are inside the ROPEs we decide that a sample is present (step 6). In this way we include the full uncertainty of our estimation in our decision. To visualize this approach, we plot the marginal posteriors together with the ROPEs below.
 
-axs = az.plot_posterior(idata, var_names=["sigma", "velocity"], rope=rope, kind="hist", point_estimate='mean', hdi_prob="hide");
+axs = az.plot_posterior(idata, var_names=["sigma", "velocity"], rope=rope, kind="kde", point_estimate='mean', hdi_prob=.95);
 axs[0].set_title("")
 axs[1].set_title("")
 axs[0].set_xlabel("$\sigma$")
