@@ -17,17 +17,20 @@ import numpy as np
 import dataprep
 
 
-def raw2widthaverage(inname, channel):
-    data_raw = raw2images(inname, channel)
+def raw2widthaverage(inname, channel, background=True):
+    data_raw = raw2images(inname, channel, background=background)
     return dataprep.averageoverheight(data_raw)
 
 
-def raw2images(inname, channel, background=None):
+def raw2images(inname, channel, background=True):
     data_raw = dataprep.load_nd_data(inname, verbose=False)
     print(data_raw.shape)
     data_raw = dataprep.cuttochannel(data_raw, channel[0], channel[1])
-    background = np.mean(data_raw[:,:,0:50], axis=2)
-    return dataprep.substractbackground(data_raw, background)
+    if background:
+        background = np.mean(data_raw[:,:,0:50], axis=2)
+        return dataprep.substractbackground(data_raw, background)
+    else:
+        return data_raw
 
 
 def raw2frameaverage(inname, channel):
