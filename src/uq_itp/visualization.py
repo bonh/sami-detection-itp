@@ -18,6 +18,7 @@
 # %autoreload 2
 
 # +
+import matplotlib as mpl
 import matplotlib.pyplot as plt
 from matplotlib.gridspec import GridSpec
 import numpy as np
@@ -28,6 +29,12 @@ import arviz as az
 import helper
 import dataprep
 import bayesian
+# -
+
+#mpl.rcParams['figure.dpi'] = 100
+#mpl.rcParams['text.usetex'] = True
+#mpl.rcParams['text.latex.preamble'] = r'\usepackage{mathtools}'
+plt.style.use(['science', 'vibrant'])
 
 # +
 #inname = "/home/cb51neqa/projects/itp/exp_data/ITP_AF647_5µA/AF_10ng_l/001.nd2"
@@ -45,6 +52,8 @@ px = 1.6e-6 # size of pixel (m/px)
 sigma_mean = 10
 rope_sigma = (5,15)
 rope_velocity = (200,250)
+
+time = 150
 
 # +
 data_raw = helper.raw2images(inname, (channel_lower, channel_upper))
@@ -111,8 +120,6 @@ with bayesian.signalmodel(data_mean, x) as model:
     
     hdi2 = az.hdi(idata2.posterior_predictive, hdi_prob=.95)
 
-az.plot_posterior(idata2, var_names=["sigma_noise", "sigma", "centroid", "amplitude", "c", "b", "snr"]);
-
 with bayesian.signalmodel(data[:,time], x) as model:
     trace3 = pm.sample(return_inferencedata=False, cores=4, target_accept=0.9)
       
@@ -121,8 +128,6 @@ with bayesian.signalmodel(data[:,time], x) as model:
     summary3 = az.summary(idata3)
 
 # +
-time = 150
-
 fig = plt.figure(constrained_layout=True, figsize=(15,7))
 gs = GridSpec(3, 6, figure=fig)
 
@@ -147,7 +152,7 @@ ax3.set_yticks(np.linspace(0, nframes, 3))
 
 
 plt.setp(ax1.get_xticklabels(), visible=False);
-plt.setp(ax2.get_xticklabels(), visible=False);
+#plt.setp(ax2.get_xticklabels(), visible=False);
 
 #
 #ax4 = fig.add_subplot(gs[0, 1])
@@ -155,13 +160,13 @@ plt.setp(ax2.get_xticklabels(), visible=False);
 #ax4.set_ylabel("corr.\nintensity (AU)", va='center');
 
 ax5 = fig.add_subplot(gs[0, 2:4])
-ax5.imshow(corr[0:int(corr.shape[0]/2),:].T, aspect="auto", origin="lower")
+ax5.imshow(corr[0:int(corr.shape[0]/2),:].T, aspect="auto", origin="lower", extent=[x_lag[0],x_lag[-1],0,corr[0:int(corr.shape[0]/2),:].T.shape[0]])
 ax5.set_ylabel("corr. frame");
 ax5.set_title("C (correlated frames)", loc="left")
-#extent=[x_lag[0],x_lag[-1],0,corr[0:int(corr.shape[0]/2),:].T.shape[1]]
+#
 ax5.set_yticks(np.linspace(0, corr[0:int(corr.shape[0]/2),:].T.shape[0], 3))
 
-ax6 = fig.add_subplot(gs[1, 2:4], sharex=ax4)
+ax6 = fig.add_subplot(gs[1, 2:4], sharex=ax5)
 ax6.plot(x_lag, corr_mean, alpha=0.8)
 ax6.plot(x_lag, idata.posterior_predictive.mean(("chain", "draw"))["y"], label="fit")
 ax6.fill_between(x_lag, hdi["y"][:,0], hdi["y"][:,1], alpha=0.2, label=".95 HDI")
@@ -169,7 +174,7 @@ ax6.set_ylabel("avg. corr. intensity (AU)")
 ax6.set_xlabel("lag (px)");
 ax6.set_title("D (avg. corr. frames, fit, .95 HDI)", loc="left")
 ax6.set_xticks(np.linspace(-length/2, 0, 5))
-ax6.set_yticks(np.linspace(np.floor(np.min(corr_mean)), np.ceil(np.max(corr_mean)), 3))
+ax6.set_yticks(np.linspace(0, np.ceil(np.max(corr_mean)), 3))
 
 #plt.setp(ax4.get_xticklabels(), visible=False);
 plt.setp(ax5.get_xticklabels(), visible=False);
@@ -204,10 +209,12 @@ ax9.plot(hdi2["y"][:,1], "r-", alpha=0.4, label=".95 HDI")
 #ax9.fill_between(x, hdi2["y"][:,0], hdi2["y"][:,1], alpha=0.2, label=".95 HDI")
 #axs[1].legend();
 ax9.set_xticks(np.linspace(0, length, 5))
-ax9.set_yticks(np.linspace(np.floor(np.min(data_mean)), np.ceil(np.max(data_mean)), 3))
+ax9.set_yticks(np.linspace(0, np.ceil(np.max(data_mean)), 3))
 ax9.set_xlabel("length (px)")
 ax9.set_ylabel("avg. intensity (AU)");
-ax9.set_title("G (shifted & avg. frames)", loc="left")
+ax9.set_title(r"G (shifted \& avg. frames)", loc="left")
+ax9.set_xlim(0, length)
+ax9.set_ylim(-2.5,7)
 ax9.legend()
 
 plt.setp(ax8.get_xticklabels(), visible=False);
@@ -227,5 +234,40 @@ axs.set_xlabel("avg. frames")
 #
 fig.align_ylabels()
 # -
+summary
+
+frames, means, lows, heighs = [], [], [], []
+for i in range(0,10):
+    start = startframe+20
+    end = int(start + (endframe-startframe)/10*i)+1
+    data_mean = np.mean(data_shifted[:,start:end], axis=1).reshape(-1, 1)
+
+    scaler = preprocessing.StandardScaler().fit(data_mean)
+    data_mean = scaler.transform(data_mean).flatten()
+    
+    x = np.linspace(0, len(data_mean), len(data_mean))
+    with bayesian.signalmodel(data_mean, x) as model:
+        trace2 = pm.sample(4000, return_inferencedata=False, cores=4, target_accept=0.9)
+    
+        ppc2 = pm.fast_sample_posterior_predictive(trace2, model=model)
+        idata2 = az.from_pymc3(trace=trace2, posterior_predictive=ppc2, model=model) 
+        summary2 = az.summary(idata2, var_names=["snr"])
+        
+    frames.append(end-start) 
+    means.append(summary2["mean"]["snr"])
+    lows.append(summary2["hdi_3%"]["snr"])  
+    heighs.append(summary2["hdi_97%"]["snr"]) 
+
+plt.figure(figsize=(5,3))
+plt.plot(frames, means, "x");
+plt.plot(frames, lows, "r--");
+plt.plot(frames, heighs, "r--");
+plt.plot(frames, np.sqrt(frames))
+plt.plot(frames, np.power(frames, 1/1.7))
+plt.xlabel("frames")
+plt.ylabel("snr");
+plt.yticks(np.linspace(0, 20, 5));
+
+
 
 
