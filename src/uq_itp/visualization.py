@@ -37,8 +37,8 @@ import bayesian
 plt.style.use(['science', 'vibrant'])
 
 # +
-#inname = "/home/cb51neqa/projects/itp/exp_data/ITP_AF647_5µA/AF_10ng_l/001.nd2"
-inname = "/home/cb51neqa/projects/itp/exp_data/ITP_AF647_5µA/AF_0.1ng_l/001.nd2"
+inname = "/home/cb51neqa/projects/itp/exp_data/ITP_AF647_5µA/AF_10ng_l/001.nd2"
+#inname = "/home/cb51neqa/projects/itp/exp_data/ITP_AF647_5µA/AF_0.1ng_l/001.nd2"
 
 channel_lower = 27
 channel_upper = 27
@@ -235,39 +235,3 @@ axs.set_xlabel("avg. frames")
 fig.align_ylabels()
 # -
 summary
-
-frames, means, lows, heighs = [], [], [], []
-for i in range(0,10):
-    start = startframe+20
-    end = int(start + (endframe-startframe)/10*i)+1
-    data_mean = np.mean(data_shifted[:,start:end], axis=1).reshape(-1, 1)
-
-    scaler = preprocessing.StandardScaler().fit(data_mean)
-    data_mean = scaler.transform(data_mean).flatten()
-    
-    x = np.linspace(0, len(data_mean), len(data_mean))
-    with bayesian.signalmodel(data_mean, x) as model:
-        trace2 = pm.sample(4000, return_inferencedata=False, cores=4, target_accept=0.9)
-    
-        ppc2 = pm.fast_sample_posterior_predictive(trace2, model=model)
-        idata2 = az.from_pymc3(trace=trace2, posterior_predictive=ppc2, model=model) 
-        summary2 = az.summary(idata2, var_names=["snr"])
-        
-    frames.append(end-start) 
-    means.append(summary2["mean"]["snr"])
-    lows.append(summary2["hdi_3%"]["snr"])  
-    heighs.append(summary2["hdi_97%"]["snr"]) 
-
-plt.figure(figsize=(5,3))
-plt.plot(frames, means, "x");
-plt.plot(frames, lows, "r--");
-plt.plot(frames, heighs, "r--");
-plt.plot(frames, np.sqrt(frames))
-plt.plot(frames, np.power(frames, 1/1.7))
-plt.xlabel("frames")
-plt.ylabel("snr");
-plt.yticks(np.linspace(0, 20, 5));
-
-
-
-
