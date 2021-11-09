@@ -61,18 +61,19 @@ def signalmodel_correlation(data, x, px, lagstep, fps):
 def signalmodel(data, x):
     with pm.Model() as model:
         # background
-        # f = b*x + c
-        #aa = pm.Normal("a", 0, 0.0001)
-        b = pm.Normal('b', 0, 0.1)
+        # f = c
         c = pm.Normal('c', 0, 1)
+        b = pm.Normal('b', 0, 1)
+        #d = pm.Normal('d', 0, 1)
         
+        #background = pm.Deterministic("background", d*x**2+b*x+c)
         background = pm.Deterministic("background", b*x+c)
 
         # sample peak
-        amp = pm.HalfNormal('amplitude', 10)
+        amp = pm.HalfNormal('amplitude', 50)
         cent = pm.Uniform('centroid', 0, len(data))
         sig = pm.Deterministic("sigma", pm.Beta('beta', 2, 2)*20)# TODO: calculate from physics?
-        alpha = pm.Normal("alpha", 0, 1)
+        alpha = pm.Normal("alpha", 0, 10)
 
         def sample(amp, cent, sig, x):       
             return amp*tt.exp(-(cent - x)**2/2/sig**2) * (1-tt.erf((alpha*(cent - x))/tt.sqrt(2)/sig))
@@ -89,7 +90,17 @@ def signalmodel(data, x):
         likelihood = pm.Normal('y', mu = signal, sd=sigma_noise, observed = data)
         
         # derived quantities
-        snr = pm.Deterministic("snr", amp/sigma_noise)
+        def fmax(A, c, sigma, a):
+            erf = tt.erf
+            sqrt = tt.sqrt
+            pi = np.pi
+            exp = tt.exp
+            Abs = pm.math.abs_
+            sign = pm.math.sgn
+            return A*(erf(sqrt(2)*a*(-sqrt(2)*a*(2 - pi/2)/(pi**(3/2)*sqrt(a**2 + 1)*(-2*a**2/(pi*(a**2 + 1)) + 1)**1.0) + sqrt(2)*a/(sqrt(pi)*sqrt(a**2 + 1)) - exp(-2*pi/Abs(a))*sign(a)/2)/2) + 1)*exp(-(-sqrt(2)*a*(2 - pi/2)/(pi**(3/2)*sqrt(a**2 + 1)*(-2*a**2/(pi*(a**2 + 1)) + 1)**1.0) + sqrt(2)*a/(sqrt(pi)*sqrt(a**2 + 1)) - exp(-2*pi/Abs(a))*sign(a)/2)**2/2)
+
+        fmax = pm.Deterministic("fmax", fmax(amp, cent, sig, alpha))
+        snr = pm.Deterministic("snr", fmax/sigma_noise)
 
         return model
     

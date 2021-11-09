@@ -31,14 +31,14 @@ import dataprep
 import bayesian
 # -
 
-#mpl.rcParams['figure.dpi'] = 100
+mpl.rcParams['figure.dpi'] = 300
 #mpl.rcParams['text.usetex'] = True
 #mpl.rcParams['text.latex.preamble'] = r'\usepackage{mathtools}'
-plt.style.use(['science', 'vibrant'])
+plt.style.use(['science', 'notebook'])
 
 # +
-inname = "/home/cb51neqa/projects/itp/exp_data/ITP_AF647_5µA/AF_10ng_l/001.nd2"
-#inname = "/home/cb51neqa/projects/itp/exp_data/ITP_AF647_5µA/AF_0.1ng_l/001.nd2"
+#inname = "/home/cb51neqa/projects/itp/exp_data/ITP_AF647_5µA/AF_10ng_l/001.nd2"
+inname = "/home/cb51neqa/projects/itp/exp_data/ITP_AF647_5µA/AF_0.1ng_l/001.nd2"
 
 channel_lower = 27
 channel_upper = 27
@@ -116,7 +116,7 @@ with bayesian.signalmodel(data_mean, x) as model:
     
     ppc2 = pm.fast_sample_posterior_predictive(trace2, model=model)
     idata2 = az.from_pymc3(trace=trace2, posterior_predictive=ppc2, model=model) 
-    summary2 = az.summary(idata2, var_names=["sigma_noise", "sigma", "centroid", "amplitude", "c", "b", "snr"])
+    summary2 = az.summary(idata2, var_names=["sigma_noise", "sigma", "centroid", "amplitude", "c", "fmax", "snr", "alpha"])
     
     hdi2 = az.hdi(idata2.posterior_predictive, hdi_prob=.95)
 
@@ -128,7 +128,7 @@ with bayesian.signalmodel(data[:,time], x) as model:
     summary3 = az.summary(idata3)
 
 # +
-fig = plt.figure(constrained_layout=True, figsize=(15,7))
+fig = plt.figure(constrained_layout=True, figsize=(20,10))
 gs = GridSpec(3, 6, figure=fig)
 
 ax1 = fig.add_subplot(gs[0, 0:2])
@@ -202,12 +202,11 @@ ax8.set_title("F (shifted frames)", loc="left")
 
 ax9 = fig.add_subplot(gs[1, 4:6])
 ax9.plot(data[:,time], alpha=0.4, label="single frame")
-ax9.plot(data_mean, label="shift+avg", alpha=0.8)
-ax9.plot(idata2.posterior_predictive.mean(("chain", "draw"))["y"], label="fit")
-ax9.plot(hdi2["y"][:,0], "r-", alpha=0.4)
-ax9.plot(hdi2["y"][:,1], "r-", alpha=0.4, label=".95 HDI")
-#ax9.fill_between(x, hdi2["y"][:,0], hdi2["y"][:,1], alpha=0.2, label=".95 HDI")
-#axs[1].legend();
+ax9.plot(data_mean, label="shift+avg", alpha=0.4)
+ax9.plot(idata2.posterior_predictive.mean(("chain", "draw"))["y"], label="fit", color="red")
+#ax9.plot(hdi2["y"][:,0], "r-", alpha=0.8)
+#ax9.plot(hdi2["y"][:,1], "r-", alpha=0.8, label=".95 HDI")
+ax9.fill_between(x, hdi2["y"][:,0], hdi2["y"][:,1], alpha=0.3, label=".95 HDI", color="red")
 ax9.set_xticks(np.linspace(0, length, 5))
 ax9.set_yticks(np.linspace(0, np.ceil(np.max(data_mean)), 3))
 ax9.set_xlabel("length (px)")
@@ -234,4 +233,24 @@ axs.set_xlabel("avg. frames")
 #
 fig.align_ylabels()
 # -
-summary
+fig, ax9 = plt.subplots(figsize=(10,5))
+ax9.plot(data[:,time], alpha=0.4, label="single frame")
+ax9.plot(data_mean, label="shift+avg", alpha=0.4)
+ax9.plot(idata2.posterior_predictive.mean(("chain", "draw"))["y"], label="fit", color="red")
+#ax9.plot(hdi2["y"][:,0], "r-", alpha=0.8)
+#ax9.plot(hdi2["y"][:,1], "r-", alpha=0.8, label=".95 HDI")
+#ax9.fill_between(x, hdi2["y"][:,0], hdi2["y"][:,1], alpha=0.3, label=".95 HDI", color="red")
+ax9.set_xticks(np.linspace(0, length, 5))
+ax9.set_yticks(np.linspace(0, np.ceil(np.max(data_mean)), 3))
+ax9.set_xlabel("length (px)")
+ax9.set_ylabel("avg. intensity (AU)");
+ax9.set_title(r"G (shifted \& avg. frames)", loc="left")
+ax9.set_xlim(0, length)
+ax9.set_ylim(-2.5,7)
+ax9.legend()
+
+summary2
+
+az.plot_posterior(idata2, var_names=["sigma", "centroid", "amplitude", "c", "fmax", "snr", "alpha"])
+
+
