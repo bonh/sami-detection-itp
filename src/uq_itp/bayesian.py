@@ -31,9 +31,9 @@ def signalmodel_correlation(data, x, px, lagstep, fps):
         background = pm.Deterministic("background", c)
 
         # sample peak
-        amp = pm.HalfNormal('amplitude', 10) 
+        amp = pm.HalfNormal('amplitude', 20) 
         cent = pm.Uniform('centroid', 0, len(data))
-        sig = pm.HalfNormal('sigma', 20) # TODO: calculate from physics?
+        sig = pm.HalfNormal('sigma', 50) # TODO: calculate from physics?
         #alpha = pm.Normal("alpha", 0, 0.1)
 
         def sample(amp, cent, sig, x):        
@@ -56,8 +56,8 @@ def signalmodel_correlation(data, x, px, lagstep, fps):
 
         return model
     
-def model_sample(amp, cent, sig, x):       
-    return amp*tt.exp(-(cent - x)**2/2/sig**2) * (1-tt.erf((alpha*(cent - x))/tt.sqrt(2)/sig))
+def model_sample(a, c, w, alpha, x):       
+    return a*tt.exp(-(c - x)**2/2/w**2) * (1-tt.erf((alpha*(c - x))/tt.sqrt(2)/w))
 
 def signalmodel(data, x):
     with pm.Model() as model:
@@ -76,7 +76,7 @@ def signalmodel(data, x):
         sig = pm.Deterministic("sigma", pm.Beta('beta', 2, 2)*20)# TODO: calculate from physics?
         alpha = pm.Normal("alpha", 0, 10)
         
-        sample = pm.Deterministic("sample", model_sample(amp, cent, sig, x))
+        sample = pm.Deterministic("sample", model_sample(amp, cent, sig, alpha, x))
         
         # background + sample
         signal = pm.Deterministic('signal', background + sample)
