@@ -54,8 +54,8 @@ rope_sigma = (5,15)
 rope_velocity = (200,250)
 
 time = 150
+# -
 
-# +
 data_raw = helper.raw2images(inname, (channel_lower, channel_upper))
 
 height = data_raw.shape[0]
@@ -75,7 +75,7 @@ corr = dataprep.correlate_frames(data, lagstep)
 scaler = preprocessing.StandardScaler().fit(corr)
 corr = scaler.transform(corr)
 
-corr_mean = np.mean(corr[:,startframe:endframe], axis=1).reshape(-1, 1)
+corr_mean = np.mean(corr[:,startframe:endframe-lagstep], axis=1).reshape(-1, 1)
 x_lag = np.linspace(-corr_mean.shape[0]/2, corr_mean.shape[0]/2, corr_mean.shape[0])
 
 # clean the correlation data
