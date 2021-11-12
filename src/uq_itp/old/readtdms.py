@@ -30,14 +30,26 @@ time = tdms_file.groups()[0].channels()[0]
 voltage = tdms_file.groups()[0].channels()[1]
 corr = tdms_file.groups()[0].channels()[2]
 
-plt.plot(time.data, corr);
-
-plt.plot(time.data, voltage);
+plt.plot(voltage);
 
 startframe = 420
 
-plt.plot(time[startframe:], voltage[startframe:]);
+# +
+import numpy as np
+x = voltage[startframe:]
+x = (x-np.min(x))/(np.max(x)-np.min(x))
 
-time[-1]-time[startframe]
+y = time[startframe:]
+y = (y-np.min(y))/(np.max(y)-np.min(y))
+(m, b) = np.polyfit(y, x, 1)
+xp = np.polyval([m, b], y)
+
+plt.figure(figsize=(3,3))
+plt.scatter(y[::5], x[::5], marker="o")
+plt.plot(y, xp, "red");
+plt.xlabel("time")
+plt.ylabel("voltage");
+plt.annotate("linear fit", (0.6, 0.6), (0.6,0.4), arrowprops=dict(arrowstyle="->"));
+# -
 
 
