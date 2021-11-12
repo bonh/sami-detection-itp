@@ -63,3 +63,6 @@ def correlate_frames(data, step):
         corr[:,i] = np.correlate(data[:,i], data[:,i+step], "same")
 
     return corr
+
+def standardize(data):
+    return (data-np.mean(data))/np.std(data)
