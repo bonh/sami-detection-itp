@@ -30,101 +30,160 @@ import matplotlib.animation as animation
 
 import dataprep
 import bayesian
-# -
+import helper
 
-# from experiment
+# +
+#inname = "/home/cb51neqa/projects/itp/exp_data/ITP_AF647_5µA/AF_10ng_l/001.nd2"
+inname = "/home/cb51neqa/projects/itp/exp_data/ITP_AF647_5µA/AF_0.1ng_l/001.nd2"
+
+channel_lower = 27
+channel_upper = 27
+
+startframe = 150
+endframe = 250
+
 fps = 46 # frames per second (1/s)
 px = 1.6e-6 # size of pixel (m/px)
 
-512*px*fps/2.2e-4
+sigma_mean = 10
+rope_sigma = (5,15)
+rope_velocity = (200,250)
 
-inname = "/home/cb51neqa/projects/itp/exp_data/ITP_AF647_5µA/AF_0.1ng_l/001.nd2"
-channel = [27, 27]
-lagstep = 30
-frames = [170,270]
+time = 150
 
 # +
-data_raw = dataprep.load_nd_data(inname, verbose=False)
-#data_raw = dataprep.cuttochannel(data_raw, channel[0], channel[1])
-background = np.mean(data_raw[:,:,0:10],axis=2)
-data_raw = dataprep.substractbackground(data_raw, background)
-data = dataprep.averageoverheight(data_raw)
-    
-corr = dataprep.correlate_frames(data, lagstep)
-    
-corr = corr[:,frames[0]:frames[1]]
-    
-corr_mean = np.mean(corr, axis=1).reshape(-1, 1)
-    
-x = np.linspace(-corr_mean.shape[0]/2, corr_mean.shape[0]/2, corr_mean.shape[0])
-corr_mean[int(corr_mean.shape[0]/2)] = 0
-corr_mean = corr_mean[0:int(corr_mean.shape[0]/2)]
-x = x[0:int(corr_mean.shape[0])]
-x *= -1
-    
-scaler = preprocessing.MinMaxScaler().fit(corr_mean)
-corr_mean = scaler.transform(corr_mean).flatten()
-    
-with bayesian.create_signalmodel(corr_mean, x) as model:
-    trace_mean = pm.sample(20000, return_inferencedata=True, cores=4)
-# -
+data_raw = helper.raw2images(inname, (channel_lower, channel_upper))
 
 height = data_raw.shape[0]
 length = data_raw.shape[1]
 nframes = data_raw.shape[2]
-
-summary_mean = az.summary(trace_mean, var_names=["amplitude", "centroid", "sigma", "baseline", "sigma_noise"])
-
-# +
-map_estimate = summary_mean.loc[:, "mean"]
-corr_mean_fit = bayesian.model_signal(map_estimate["amplitude"], map_estimate["centroid"], map_estimate["sigma"], map_estimate["baseline"], x)
-
-dx = map_estimate["centroid"]*px
-dt = lagstep/fps # s
-
-v = dx/dt # mm/s
-print("sample velocity = {} mm/s".format(v*1e3))
+print("height = {}, length = {}, nframes = {}".format(height, length, nframes))
 # -
 
-data_shifted = dataprep.shift_data(data, v, fps, px)
-plt.imshow(data_shifted.T,origin="lower")
+tmp = dataprep.averageoverheight(data_raw)
+scaler = preprocessing.StandardScaler().fit(tmp)
+data = scaler.transform(tmp)
 
 # +
-frames2try = np.arange(frames[0]+1, frames[0]+100, 10)
+lagstep = 30 
+corr = dataprep.correlate_frames(data, lagstep)
+
+scaler = preprocessing.StandardScaler().fit(corr)
+corr = scaler.transform(corr)
+
+corr_mean = np.mean(corr[:,startframe:endframe], axis=1).reshape(-1, 1)
+x_lag = np.linspace(-corr_mean.shape[0]/2, corr_mean.shape[0]/2, corr_mean.shape[0])
+
+# clean the correlation data
+# remove peak at zero lag
+corr_mean[int(corr_mean.shape[0]/2)] = 0
+#cut everything right of the middle (because we know that the velocity is positiv)
+corr_mean = corr_mean[0:int(corr_mean.shape[0]/2)]
+
+x_lag = x_lag[0:int(corr_mean.shape[0])]
+
+scaler = preprocessing.StandardScaler().fit(corr_mean)
+corr_mean = scaler.transform(corr_mean).flatten()
+# -
+
+with bayesian.signalmodel_correlation(corr_mean, -x_lag, px, lagstep, fps) as model:
+    trace = pm.sample(return_inferencedata=False, cores=4, target_accept=0.9)
+      
+    ppc = pm.fast_sample_posterior_predictive(trace, model=model)
+    idata = az.from_pymc3(trace=trace, posterior_predictive=ppc, model=model) 
+    summary = az.summary(idata, var_names=["sigma_noise", "sigma", "centroid", "amplitude", "c", "b", "velocity"])
+    
+    hdi = az.hdi(idata.posterior_predictive, hdi_prob=.95)
+
+v = summary["mean"]["velocity"]*1e-6
+print("Mean velocity of the sample is v = {} $microm /s$.".format(v*1e6))
+data_shifted = dataprep.shift_data(data, v, fps, px)
+
+# +
+frames2try = np.linspace(startframe+10, endframe, 6, dtype=int)
 print(frames2try)
 N = len(frames2try)
 
 j = 0
-a, sigma, nframes = np.zeros(N), np.zeros(N), np.zeros(N)
+
+idatas = []
+snr = np.zeros((4,N))
 for i in range(0,N):
-    tmp = data_shifted[:, frames[0]:frames2try[i]]
+    j = 0
+    while True:
+        try:
+            print(frames2try[i]-startframe)
+            tmp = data_shifted[:, startframe:frames2try[i]]
+            avg = np.mean(tmp, axis=1).reshape(-1,1)
+    
+            scaler = preprocessing.StandardScaler().fit(avg)
+            avg = scaler.transform(avg).flatten()
+    
+            x = np.linspace(0, len(avg), len(avg))
+            with bayesian.signalmodel(avg, x) as model:
+                trace = pm.sample(2000, return_inferencedata=False, cores=4, target_accept=0.9)
+    
+                ppc = pm.fast_sample_posterior_predictive(trace, model=model)
+                idata = az.from_pymc3(trace=trace, posterior_predictive=ppc, model=model) 
+                summary = az.summary(idata, var_names=["sigma_noise", "sigma", "centroid", "amplitude", "c", "fmax", "snr", "alpha"])
+        
+            mean = summary.loc[:, "mean"]
+            hdi_low = summary.loc[:, "hdi_3%"]
+            hdi_high = summary.loc[:, "hdi_97%"]
+
+            snr[:,i] = [frames2try[i]-startframe, mean["snr"], hdi_low["snr"], hdi_high["snr"]]
+            idatas.append(idata)
+        except:
+            if j<3:
+                print("retry")
+                j+=1
+                continue
+            else:
+                break
+        break
+
+# +
+fig, ax1 = plt.subplots()
+
+x = snr[0,:]
+y = snr[1,:]
+yerr = np.abs(snr[2:4,:]-y)
+ax1.plot(x, y, marker="o", color="red", linestyle="None", label="snr and .97 HDI")
+x_ = np.linspace(0, x[-1], 100)
+ax1.plot(x_, y[-3]*np.sqrt(x_/x[-3]), label="$\propto \sqrt{n}$") 
+ax1.annotate(r"$\mathit{snr} \propto N$", xy=(50, 11), xytext=(40, 15), arrowprops=dict(arrowstyle="->"))
+ax1.set_xlabel("number of frames $N$")
+ax1.set_ylabel("signal-to-noise $snr$")
+
+def bla(endframe):
+    tmp = data_shifted[:, startframe:endframe]
     avg = np.mean(tmp, axis=1).reshape(-1,1)
     
     scaler = preprocessing.StandardScaler().fit(avg)
-    avg = scaler.transform(avg).flatten()
-    
-    x = np.linspace(0, len(avg), len(avg))
+    return scaler.transform(avg).flatten()
 
-    with bayesian.create_signalmodel(avg, x) as model:
-        trace_mean = pm.sample(20000, return_inferencedata=True, cores=4, progressbar=False)
-        
-    summary_mean = az.summary(trace_mean, var_names=["amplitude", "centroid", "sigma", "baseline", "sigma_noise"])
-    map_estimate = summary_mean.loc[:, "mean"]
-        
-    print(frames2try[i]-frames[0], map_estimate["amplitude"], map_estimate["sigma_noise"])
-    a[j]  = map_estimate["amplitude"]
-    sigma[j] = map_estimate["sigma_noise"]
-    
-    j+=1
-# -
+x = np.linspace(0, len(avg), len(avg))
 
-x = frames2try-frames[0]
-x_ = np.linspace(x[0], x[-1], 100)
-snr = a/sigma
-plt.plot(x, snr, "ro", label="$snr$")
-plt.plot(x_, np.sqrt(x_), label="$\propto \sqrt{n}$") 
-plt.xlabel("no. frames $n$")
-plt.ylabel("signal-to-noise $snr=A/\sigma$")
-plt.legend();
+left, bottom, width, height = [0.15, 0.65, 0.2, 0.2]
+ax2 = fig.add_axes([left, bottom, width, height])
+ax2.plot(x[::5], bla(frames2try[0])[::5], alpha=0.5)
+ax2.plot(x, idatas[0].posterior_predictive.mean(("chain", "draw"))["y"], color="red")
+ax1.annotate("", xy=(10, 10.5), xytext=(10, 5), arrowprops=dict(arrowstyle="<-"))
+ax2.get_yaxis().set_ticks([])
+ax2.get_xaxis().set_ticks([])
 
+left, bottom, width, height = [0.67, 0.2, 0.2, 0.2]
+ax2 = fig.add_axes([left, bottom, width, height])
+ax2.plot(x[::5], bla(frames2try[-1])[::5], alpha=0.5)
+ax2.plot(x, idatas[-1].posterior_predictive.mean(("chain", "draw"))["y"], color="red")
+ax1.annotate("", xy=(90, 6), xytext=(100, 14), arrowprops=dict(arrowstyle="<-"))
+ax2.get_yaxis().set_ticks([])
+ax2.get_xaxis().set_ticks([]);
 
+left, bottom, width, height = [0.4, 0.2, 0.2, 0.2]
+ax2 = fig.add_axes([left, bottom, width, height])
+ax2.plot(x[::5], bla(frames2try[-4])[::5], alpha=0.5)
+ax2.plot(x, idatas[-4].posterior_predictive.mean(("chain", "draw"))["y"], color="red")
+ax1.annotate("", xy=(50, 6), xytext=(47, 9.5), arrowprops=dict(arrowstyle="<-"))
+ax2.get_yaxis().set_ticks([])
+ax2.get_xaxis().set_ticks([]);
