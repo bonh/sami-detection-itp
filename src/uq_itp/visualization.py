@@ -229,6 +229,20 @@ ax11 = fig.add_subplot(gs[2, 5:6])
 axs = az.plot_posterior(idata2, var_names=["snr"], kind="hist", point_estimate='mean', hdi_prob=.95, ax=ax11, textsize=10);
 axs.set_title("")
 axs.set_xlabel("avg. frames")
+#
+
+ax1 = fig.add_subplot(gs[2, 0:2])
+
+dx =  v/fps
+data_shifted_raw = np.zeros(data_raw.shape)
+for i in range(0, data_raw.shape[2]):
+    shift = data_raw.shape[1] - int(i*dx/px)%data_raw.shape[1]
+    data_shifted_raw[:,:,i] = np.roll(data_raw[:,:,i], shift)
+    
+ax1.imshow(np.mean(data_shifted_raw, axis=2), origin="lower", extent=(0, length, 0, height),aspect="auto")
+ax1.set_yticks(np.linspace(0, height, 3))
+ax1.set_ylabel("height (px)")
+ax1.set_title("I (shifted, single frame)", loc="left")
 
 #
 fig.align_ylabels()
