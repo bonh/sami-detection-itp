@@ -29,9 +29,10 @@ import arviz as az
 import helper
 import dataprep
 import bayesian
-# -
 
+# +
 mpl.rcParams['figure.dpi'] = 300
+
 #mpl.rcParams['text.usetex'] = True
 #mpl.rcParams['text.latex.preamble'] = r'\usepackage{mathtools}'
 plt.style.use(['science', 'notebook'])
@@ -245,23 +246,3 @@ ax1.set_title("I (shifted, single frame)", loc="left")
 
 #
 fig.align_ylabels()
-# -
-fig, ax9 = plt.subplots(figsize=(10,5))
-ax9.plot(data[:,time], alpha=0.4, label="single frame")
-ax9.plot(data_mean, label="shift+avg", alpha=0.4)
-ax9.plot(idata2.posterior_predictive.mean(("chain", "draw"))["y"], label="fit", color="red")
-#ax9.plot(hdi2["y"][:,0], "r-", alpha=0.8)
-#ax9.plot(hdi2["y"][:,1], "r-", alpha=0.8, label=".95 HDI")
-#ax9.fill_between(x, hdi2["y"][:,0], hdi2["y"][:,1], alpha=0.3, label=".95 HDI", color="red")
-ax9.set_xticks(np.linspace(0, length, 5))
-ax9.set_yticks(np.linspace(0, np.ceil(np.max(data_mean)), 3))
-ax9.set_xlabel("length (px)")
-ax9.set_ylabel("avg. intensity (AU)");
-ax9.set_title(r"G (shifted \& avg. frames)", loc="left")
-ax9.set_xlim(0, length)
-ax9.set_ylim(-2.5,7)
-ax9.legend()
-
-summary2
-
-az.plot_posterior(idata2, var_names=["sigma", "centroid", "amplitude", "c", "fmax", "snr", "alpha"])
