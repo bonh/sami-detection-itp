@@ -22,7 +22,6 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 from matplotlib.gridspec import GridSpec
 import numpy as np
-from sklearn import preprocessing
 import pymc3 as pm
 import arviz as az
 
@@ -64,18 +63,16 @@ length = data_raw.shape[1]
 nframes = data_raw.shape[2]
 print("height = {}, length = {}, nframes = {}".format(height, length, nframes))
 
-tmp = dataprep.averageoverheight(data_raw)
-scaler = preprocessing.StandardScaler().fit(tmp)
-data = scaler.transform(tmp)
+data = dataprep.averageoverheight(data_raw)
+data = dataprep.standardize(data) 
 
 # +
 lagstep = 30 
 corr = dataprep.correlate_frames(data, lagstep)
 
-scaler = preprocessing.StandardScaler().fit(corr)
-corr = scaler.transform(corr)
+corr = dataprep.standardize(corr)
 
-corr_mean = np.mean(corr[:,startframe:endframe-lagstep], axis=1).reshape(-1, 1)
+corr_mean = np.mean(corr[:,startframe:endframe-lagstep], axis=1)
 x_lag = np.linspace(-corr_mean.shape[0]/2, corr_mean.shape[0]/2, corr_mean.shape[0])
 
 # clean the correlation data
@@ -86,8 +83,7 @@ corr_mean = corr_mean[0:int(corr_mean.shape[0]/2)]
 
 x_lag = x_lag[0:int(corr_mean.shape[0])]
 
-scaler = preprocessing.StandardScaler().fit(corr_mean)
-corr_mean = scaler.transform(corr_mean).flatten()
+corr_mean = dataprep.standardize(corr_mean)
 # -
 
 with bayesian.signalmodel_correlation(corr_mean, -x_lag, px, lagstep, fps) as model:
@@ -104,10 +100,9 @@ v = summary["mean"]["velocity"]*1e-6
 print("Mean velocity of the sample is v = {} $microm /s$.".format(v*1e6))
 data_shifted = dataprep.shift_data(data, v, fps, px)
 
-data_mean = np.mean(data_shifted[:,startframe:endframe], axis=1).reshape(-1, 1)
+data_mean = np.mean(data_shifted[:,startframe:endframe], axis=1)
 
-scaler = preprocessing.StandardScaler().fit(data_mean)
-data_mean = scaler.transform(data_mean).flatten()
+data_mean = dataprep.standardize(data_mean)
 # -
 
 x = np.linspace(0, len(data_mean), len(data_mean))
