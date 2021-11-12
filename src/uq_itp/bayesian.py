@@ -27,15 +27,16 @@ def signalmodel_correlation(data, x, px, lagstep, fps):
         # background
         # f = b*x + c
         #aa = pm.Normal("a", 0, 0.0001)
-        b = pm.Normal('b', 0, 1)
+        #b = pm.Normal('b', 0, 1)
         c = pm.Normal('c', 0, 1)
         
-        background = pm.Deterministic("background", b*x+c)
+        #background = pm.Deterministic("background", b*x+c)
+        background = pm.Deterministic("background", c)
 
         # sample peak
-        amp = pm.Normal('amplitude', 1, 10) 
+        amp = pm.HalfNormal('amplitude', 10) 
         cent = pm.Uniform('centroid', 0, len(data))
-        sig = pm.Uniform('sigma', 0, 100) # TODO: calculate from physics?
+        sig = pm.HalfNormal('sigma', 20) # TODO: calculate from physics?
         #alpha = pm.Normal("alpha", 0, 0.1)
 
         def sample(amp, cent, sig, x):        
