@@ -62,7 +62,6 @@ height = data_raw.shape[0]
 length = data_raw.shape[1]
 nframes = data_raw.shape[2]
 print("height = {}, length = {}, nframes = {}".format(height, length, nframes))
-# -
 
 tmp = dataprep.averageoverheight(data_raw)
 scaler = preprocessing.StandardScaler().fit(tmp)
@@ -95,7 +94,7 @@ with bayesian.signalmodel_correlation(corr_mean, -x_lag, px, lagstep, fps) as mo
       
     ppc = pm.fast_sample_posterior_predictive(trace, model=model)
     idata = az.from_pymc3(trace=trace, posterior_predictive=ppc, model=model) 
-    summary = az.summary(idata, var_names=["sigma_noise", "sigma", "centroid", "amplitude", "c", "b", "velocity"])
+    summary = az.summary(idata, var_names=["sigma_noise", "sigma", "centroid", "amplitude", "c", "velocity"])
     
     hdi = az.hdi(idata.posterior_predictive, hdi_prob=.95)
 
@@ -266,5 +265,3 @@ ax9.legend()
 summary2
 
 az.plot_posterior(idata2, var_names=["sigma", "centroid", "amplitude", "c", "fmax", "snr", "alpha"])
-
-
