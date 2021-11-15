@@ -64,7 +64,7 @@ nframes = data_raw.shape[2]
 print("height = {}, length = {}, nframes = {}".format(height, length, nframes))
 
 data = dataprep.averageoverheight(data_raw)
-data = dataprep.standardize(data) 
+data = dataprep.standardize(data)
 
 # +
 lagstep = 30 
@@ -86,7 +86,14 @@ x_lag = x_lag[0:int(corr_mean.shape[0])]
 corr_mean = dataprep.standardize(corr_mean)
 # -
 
-with bayesian.signalmodel_correlation(corr_mean, -x_lag, px, lagstep, fps) as model:
+window = 7
+corr_mean_smoothed = dataprep.simplemovingmean(corr_mean, window, beta=6)
+x_lag_smoothed = x_lag[int(window/2):-int(window/2)]
+
+plt.plot(x_lag, corr_mean)
+plt.plot(x_lag_smoothed, corr_mean_smoothed)
+
+with bayesian.signalmodel_correlation(corr_mean_smoothed, -x_lag_smoothed, px, lagstep, fps) as model:
     trace = pm.sample(return_inferencedata=False, cores=4, target_accept=0.9)
       
     ppc = pm.fast_sample_posterior_predictive(trace, model=model)
@@ -241,3 +248,10 @@ ax1.set_title("I (shifted, single frame)", loc="left")
 
 #
 fig.align_ylabels()
+# -
+
+
+
+
+
+

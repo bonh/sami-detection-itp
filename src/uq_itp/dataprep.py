@@ -66,3 +66,8 @@ def correlate_frames(data, step):
 
 def standardize(data):
     return (data-np.mean(data))/np.std(data)
+
+def simplemovingmean(data, window, beta=0):
+    window_ = np.kaiser(window, beta)
+    window_ = window_ / window_.sum()
+    return np.convolve(window_, data, mode='valid')
