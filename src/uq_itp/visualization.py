@@ -90,9 +90,6 @@ window = 7
 corr_mean_smoothed = dataprep.simplemovingmean(corr_mean, window, beta=6)
 x_lag_smoothed = x_lag[int(window/2):-int(window/2)]
 
-plt.plot(x_lag, corr_mean)
-plt.plot(x_lag_smoothed, corr_mean_smoothed)
-
 with bayesian.signalmodel_correlation(corr_mean_smoothed, -x_lag_smoothed, px, lagstep, fps) as model:
     trace = pm.sample(return_inferencedata=False, cores=4, target_accept=0.9)
       
