@@ -100,8 +100,8 @@ with bayesian.signalmodel_correlation(corr_mean_smoothed, -x_lag_smoothed, px, l
     hdi = az.hdi(idata.posterior_predictive, hdi_prob=.95)
 
 # +
-v = summary["mean"]["velocity"]*1e-6
-print("Mean velocity of the sample is v = {} $microm /s$.".format(v*1e6))
+v = bayesian.get_mode(idata.posterior, ["velocity"])[0]*1e-6
+print("Mode of velocity of the sample is v = {} $microm /s$.".format(v*1e6))
 data_shifted = dataprep.shift_data(data, v, fps, px)
 
 data_mean = np.mean(data_shifted[:,startframe:endframe], axis=1)
