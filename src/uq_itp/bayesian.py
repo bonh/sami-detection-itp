@@ -19,6 +19,10 @@ def check_rope(values, rope):
     prob = ((values > rope[0]) & (values <= rope[1])).mean()
     return prob.data
 
+def get_mode(data, var_names):
+    _, vals = az.sel_utils.xarray_to_ndarray(data, var_names=var_names)
+    return [az.plots.plot_utils.calculate_point_estimate("mode", val) for val in vals]
+
 def signalmodel_correlation(data, x, px, lagstep, fps):
     with pm.Model() as model:
         # background
