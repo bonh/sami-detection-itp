@@ -32,19 +32,34 @@ titles, detected = [], []
 
 results = np.empty((len(innames), 2))
 
-i = 0
 for inname in innames:
     # not the same for every experiment.
     # however, we are missing a good automatic decision which frames to include
-    frames = [150,200]
+    frames = [150,250]
 
-    detected, idata = detection.main(inname, channel, lagstep, frames, px, fps, rope_sigma, rope_velocity)
+    j = 0
+    while True:
+        try:
+            idata_cross, idata_multi = detection.main(inname, channel, lagstep, frames, px, fps, rope_sigma, rope_velocity)
+        except:
+            if j<3:
+                print("retry")
+                j+=1
+                continue
+            else:
+                break
 
-    title = inname.split("_")[-2]
-    title = title.replace("ng", "")
+        number = (inname.split("_")[-1]).split("/")[-1]
+        number = number.replace(".nd2", "")
+        folder = (inname.split("/")[-2])
 
-    results[i,:] = [title, detected]
-    i += 1
+        folder = folder + "/" + number
 
-print(results)
-np.savetxt("detection.dat", results)
+        from pathlib import Path
+        Path(folder).mkdir(parents=True, exist_ok=True)
+
+        idata_cross.to_netcdf(folder+"/idata_cross.nc")
+        if idata_multi:
+            idata_multi.to_netcdf(folder+"/idata_multi.nc")
+
+        break
