@@ -1,7 +1,29 @@
 import numpy as np
 from nd2reader import ND2Reader
 
-def load_nd_data(inname, startframe=0, endframe=-1, verbose=False):
+def load_nd_data(inname, startframe=0, endframe=-1, verbose=False, nth=1):
+    '''
+    Loads the image data from .nd2 file.
+
+    Parameters
+    ----------
+    inname : str
+        File name.
+    startframe : int, optional
+        First frame to load. The default is 0.
+    endframe : int, optional
+        Last frame to load. The default is -1.
+    verbose : bool, optional
+        If True, some information is printed during loading.
+        The default is False.
+    nth : int, optional
+        Load each nth frame. The default is 1.
+
+    Returns
+    -------
+    data : ndarray
+        All image/video data in one array.
+    '''
     with ND2Reader(inname) as rawimages:
         # determine metadata of the images
         height = rawimages.metadata["height"]
@@ -21,15 +43,18 @@ def load_nd_data(inname, startframe=0, endframe=-1, verbose=False):
                 print("endframe < len(rawimages)")
     
         # Y x X x N
-        data = np.zeros((height, width, end))
+        #data = np.zeros((height, width, end))
+        data = np.zeros((height, width, (end-startframe)//nth+1))
     
         #data = rawimages
         #print(np.mean(data)
     
         # load image data into data array
-        for frame in np.arange(startframe, end, 1):
-            data[:,:,frame] = rawimages[frame]
-    
+        #for frame in np.arange(startframe, end, 1):
+        #    data[:,:,frame] = rawimages[frame]
+        for i,frame in enumerate(np.arange(startframe, end, nth)):
+            data[:,:,i] = rawimages[frame]
+        
         if verbose:
             print("\ndata shape = {}".format(data.shape))
         return data
