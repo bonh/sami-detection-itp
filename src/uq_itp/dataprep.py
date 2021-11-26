@@ -44,7 +44,7 @@ def load_nd_data(inname, startframe=0, endframe=-1, verbose=False, nth=1):
     
         # Y x X x N
         #data = np.zeros((height, width, end))
-        data = np.zeros((height, width, (end-startframe)//nth+1))
+        data = np.zeros((height, width, len(np.arange(startframe, end, nth))))
     
         #data = rawimages
         #print(np.mean(data)
