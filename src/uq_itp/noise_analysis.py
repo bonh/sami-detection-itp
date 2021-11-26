@@ -18,12 +18,12 @@
 #
 # Author:       Lukas Hecht (hecht@fkp.tu-darmstadt.de)
 #
-# Date:         November 24, 2021
+# Date:         November 26, 2021
 
-# %% [markdown]
+# %% [markdown] heading_collapsed=true
 # ## Import Modules
 
-# %%
+# %% hidden=true
 import os
 
 import matplotlib.pyplot as plt
@@ -37,10 +37,10 @@ from scipy.special import erf
 
 import dataprep
 
-# %% [markdown]
+# %% [markdown] heading_collapsed=true
 # ## Load Data
 
-# %% code_folding=[]
+# %% code_folding=[] hidden=true
 #path = "/home/hecht/Documents/18_industrial/MerckLab_Isotachophoresis/03_data/BackgroundNoise/" 
 path = "../../../../03_data/BackgroundNoise/"
 
@@ -62,7 +62,7 @@ inname = "{}.nd2".format(name)
 
 TEdata = dataprep.load_nd_data(inname, nth=nth)
 
-# %% [markdown] heading_collapsed=true
+# %% [markdown] heading_collapsed=true hidden=true
 # ### Plot Raw Signal
 
 # %% code_folding=[] hidden=true
@@ -93,17 +93,17 @@ anim = animation.FuncAnimation(fig, animate, init_func=init, frames=LEdata.shape
 rc('animation', html='jshtml')
 anim
 
-# %% [markdown]
+# %% [markdown] heading_collapsed=true
 # ## Pre-Processing
 
-# %%
+# %% hidden=true
 # cut to channel
 channel = [27,27]
 
 LEdata = dataprep.cuttochannel(LEdata, channel[0], channel[1])
 TEdata = dataprep.cuttochannel(TEdata, channel[0], channel[1])
 
-# %%
+# %% hidden=true
 # substract background
 LEback = np.mean(LEdata, axis=2)
 TEback = np.mean(TEdata, axis=2)
@@ -111,7 +111,7 @@ TEback = np.mean(TEdata, axis=2)
 LEfinal = dataprep.substractbackground(LEdata, LEback)
 TEfinal = dataprep.substractbackground(TEdata, TEback)
 
-# %% [markdown] heading_collapsed=true
+# %% [markdown] heading_collapsed=true hidden=true
 # ### Plot Pre-Processed Signal
 
 # %% hidden=true
@@ -148,24 +148,24 @@ print(np.min(TEfinal),np.max(TEfinal))
 
 # %% hidden=true
 
-# %% [markdown]
+# %% [markdown] heading_collapsed=true
 # ## Statistics
 
-# %%
+# %% hidden=true
 print('------- Mean values -------')
 print('LE Mean: ', np.mean(LEfinal))
 print('TE Mean: ', np.mean(TEfinal))
 
-# %%
+# %% hidden=true
 print('------- Standard Deviation -------')
 print('LE std: ', np.std(LEfinal))
 print('TE std: ', np.std(TEfinal))
 
 
-# %% [markdown]
+# %% [markdown] hidden=true
 # ### Time-Averaged Histogram of Pixel Values
 
-# %% code_folding=[0, 5]
+# %% code_folding=[0, 5, 8] hidden=true
 def histogram(data, nbins):
     hist, bin_edges = np.histogram(data, bins=nbins, density=True)
     bins = (bin_edges[1:]+bin_edges[:-1])/2
@@ -174,36 +174,50 @@ def histogram(data, nbins):
 def gauss(x, a, sig, mu):
     return a/np.sqrt(2*np.pi*sig**2) * np.exp(-(x-mu)**2/(2*sig**2))
 
+def skewGaussian(x, mu, sigma, alpha):
+    '''
+    Skew normal distribution.
+    
+    INPUT:
+        mu : mean
+        sigma: width parameter
+        alpha: skewness parameter (simple Gaussian for alpha=0.0)
+        
+    RETURN:
+        skew normal
+    '''
+    return 1/np.sqrt(2*np.pi)/sigma * np.exp(-(x-mu)**2/2/sigma**2) * (1 + erf(alpha*(x-mu)/np.sqrt(2)/sigma))
 
-# %% code_folding=[]
+
+# %% code_folding=[] hidden=true
 # histograms
 LEhist, LEbins = histogram(LEfinal, nbins=5000)
 TEhist, TEbins = histogram(TEfinal, nbins=5000)
 
-# %% code_folding=[]
+# %% code_folding=[] hidden=true
 # Gauss fit
-LEpopt, pcov = curve_fit(gauss, LEbins, LEhist, p0=[1.0, 25, 0.0], bounds=(0.0, np.inf))
+LEpopt, pcov = curve_fit(skewGaussian, LEbins, LEhist, p0=[0.0, 20, 1.0], sigma=1/np.abs(LEbins))
 LEperr = np.sqrt(np.diag(pcov))
 
-TEpopt, pcov = curve_fit(gauss, TEbins, TEhist, p0=[1.0, 25, 0.0], bounds=(0.0, np.inf))
+TEpopt, pcov = curve_fit(skewGaussian, TEbins, TEhist, p0=[0.0, 20, 1.0])
 TEperr = np.sqrt(np.diag(pcov))
 
-# %% code_folding=[]
+# %% code_folding=[] hidden=true
 # plot
 fig, axs = plt.subplots(nrows=2, ncols=1, figsize=(12,16), sharex=False)
 
 axs[0].plot(LEbins, LEhist, label='LE histogram', color='gold')
-axs[0].plot(LEbins, gauss(LEbins, LEpopt[0], LEpopt[1], LEpopt[2]),\
-            label='LE Gauss fit', color='k', linestyle='--')
+axs[0].plot(LEbins, skewGaussian(LEbins, LEpopt[0], LEpopt[1], LEpopt[2]),\
+            label='LE skew normal fit', color='k', linestyle='--')
 
 axs[1].plot(TEbins, TEhist, label='TE histogram', color='gold')
-axs[1].plot(TEbins, gauss(TEbins, TEpopt[0], TEpopt[1], TEpopt[2]),\
-            label='TE Gauss fit', color='k', linestyle='--')
+axs[1].plot(TEbins, skewGaussian(TEbins, TEpopt[0], TEpopt[1], TEpopt[2]),\
+            label='TE skew normal fit', color='k', linestyle='--')
 
-axs[0].set_title('Gaussian: $\mu$=%1.3f$\pm$%1.3f, $\sigma$=%1.3f$\pm$%1.3f, $a$=%1.3f$\pm$%1.3f'\
-                 %(LEpopt[2],LEperr[2],LEpopt[1],LEperr[1],LEpopt[0],LEperr[0]), fontsize=15)
-axs[1].set_title('Gaussian: $\mu$=%1.3f$\pm$%1.3f, $\sigma$=%1.3f$\pm$%1.3f, $a$=%1.3f$\pm$%1.3f'\
-                 %(TEpopt[2],TEperr[2],TEpopt[1],TEperr[1],TEpopt[0],TEperr[0]), fontsize=15)
+axs[0].set_title(r'Skew normal: $\mu$=%1.3f$\pm$%1.3f, $\sigma$=%1.3f$\pm$%1.3f, $\alpha$=%1.3f$\pm$%1.3f'\
+                 %(LEpopt[0],LEperr[0],LEpopt[1],LEperr[1],LEpopt[2],LEperr[2]), fontsize=15)
+axs[1].set_title(r'Skew normal: $\mu$=%1.3f$\pm$%1.3f, $\sigma$=%1.3f$\pm$%1.3f, $\alpha$=%1.3f$\pm$%1.3f'\
+                 %(TEpopt[0],TEperr[0],TEpopt[1],TEperr[1],TEpopt[2],TEperr[2]), fontsize=15)
 
 axs[0].set_xlabel('pixel value', fontsize=25)
 axs[0].set_ylabel('probability density', fontsize=25)
@@ -216,83 +230,220 @@ axs[1].tick_params(axis='both', labelsize=15)
 axs[0].legend(fontsize=25)
 axs[1].legend(fontsize=25)
 
+#axs[0].semilogy()
+#axs[1].semilogy()
 
 plt.show()
 
-# %% [markdown]
+# %% hidden=true
+print('LE Mean: ', LEpopt[0]+LEpopt[1]*LEpopt[2]/(1+LEpopt[2]**2)*np.sqrt(2/np.pi))
+print('TE Mean: ', TEpopt[0]+TEpopt[1]*TEpopt[2]/(1+TEpopt[2]**2)*np.sqrt(2/np.pi))
+
+
+# %% [markdown] hidden=true
 # The Gaussian does not fit exactly for some reason. I also tried to fit a skew normal distribution, which does fit better but results in a wrong mean value.
 #
-# ToDo: Test if an exponentially modified Gaussian (https://en.wikipedia.org/wiki/Exponentially_modified_Gaussian_distribution), which is the joined distribution of a Gaussian and exponential random variable, fits better.
-#
-# Question: Are there different processes that cause Gaussian and exponentially distributed noise?
+# Question: Are there different processes that cause the noise values to not be Gaussian distributed?
 
-# %% [markdown]
-# The next sections are not finished yet!!
+# %% hidden=true
+
+# %% hidden=true
+
+# %% hidden=true
+
+# %% hidden=true
 
 # %% [markdown] heading_collapsed=true
 # ## Spatial Correlation
 
-# %% code_folding=[0] hidden=true
-# spatial correlation (in x direction; averaged over y direction)
-x0 = [0,50,100,150,200,250,300,350,400]
+# %% hidden=true
+def correlate(x,v,mode='full'):
+    corr = signal.correlate(x, v, mode=mode)
+    corr /= np.max(corr)
+    return corr
 
 
-# LE ================================================================================
-fig, ax = plt.subplots(figsize=(12,8))
+# %% hidden=true
+# correlation (averaged over y coordinate and time)
+LEcor = 0
+for i in range(LEfinal.shape[2]):
+    for n in range(LEfinal.shape[0]):
+        c = correlate(LEfinal[n,:,i],LEfinal[n,:,i], mode='full')
+        LEcor += c
+        
+LEcor = LEcor[len(LEcor)//2:]/LEfinal.shape[0]/LEfinal.shape[2]
 
-for x in x0:
-    cor = 0
-    for i in range(LEdata2.shape[0]):
-        cor += np.mean(LEdata2[i,x,:]*LEdata2[i,x:,:], axis=1)
+TEcor = 0
+for i in range(TEfinal.shape[2]):
+    for n in range(TEfinal.shape[0]):
+        c = correlate(TEfinal[n,:,i],TEfinal[n,:,i], mode='full')
+        TEcor += c
+        
+TEcor = TEcor[len(TEcor)//2:]/TEfinal.shape[0]/TEfinal.shape[2]
 
-    cor = cor/(LEdata2.shape[1]-x) 
-    
-    ax.plot(np.arange(LEdata2.shape[1]-x), cor/cor[0], label='$x_0$=%s' %x)
-    
-ax.axhline(0.0, linewidth=1.0, color='k')
-
-ax.tick_params(axis='both', labelsize=15)
-
-ax.legend(fontsize=25)
-
-ax.set_xlabel('$\Delta x$ in px', fontsize=25)
-ax.set_ylabel(r'$\langle I(x_0)I(x_0+\Delta x)\rangle$', fontsize=25)
-
-ax.text(20,0.5,'LE',fontsize=25)
-
-ax.set_xlim(-1, LEdata2.shape[1]-max(x0))
-
+# %% hidden=true
+plt.plot(LEcor, label='LE')
+plt.plot(TEcor, label='TE')
+plt.legend()
+plt.xlabel(r'$k$ in px')
+plt.ylabel(r'$\langle I(n)I(n+k)\rangle/\langle I(n)^2\rangle$')
 plt.show()
 
+# %% hidden=true
+# correlation (averaged over x coordinate and time) - this takes very long !!!
+LEcor = 0
+for i in range(LEfinal.shape[2]):
+    for n in range(LEfinal.shape[1]):
+        c = correlate(LEfinal[:,n,i],LEfinal[:,n,i], mode='full')
+        LEcor += c
+        
+LEcor = LEcor[len(LEcor)//2:]/LEfinal.shape[1]/LEfinal.shape[2]
 
-# TE ================================================================================
-fig, ax = plt.subplots(figsize=(12,8))
+TEcor = 0
+for i in range(TEfinal.shape[2]):
+    for n in range(TEfinal.shape[1]):
+        c = correlate(TEfinal[:,n,i],TEfinal[:,n,i], mode='full')
+        TEcor += c
+        
+TEcor = TEcor[len(TEcor)//2:]/TEfinal.shape[1]/TEfinal.shape[2]
 
-for x in x0:
-    cor = 0
-    for i in range(TEdata2.shape[0]):
-        cor += np.mean(LEdata2[i,x,:]*LEdata2[i,x:,:], axis=1)
-
-    cor = cor/(LEdata2.shape[1]-x) 
-    
-    ax.plot(np.arange(LEdata2.shape[1]-x), cor/cor[0], label='$x_0$=%s' %x)
-    
-ax.axhline(0.0, linewidth=1.0, color='k')
-
-ax.tick_params(axis='both', labelsize=15)
-
-ax.legend(fontsize=25)
-
-ax.set_xlabel('$\Delta x$ in px', fontsize=25)
-ax.set_ylabel(r'$\langle I(x_0)I(x_0+\Delta x)\rangle$', fontsize=25)
-
-ax.text(20,0.5,'TE',fontsize=25)
-
-ax.set_xlim(-1, LEdata2.shape[1]-max(x0))
-
+# %% code_folding=[] hidden=true
+plt.plot(LEcor, label='LE')
+plt.plot(TEcor, label='TE')
+plt.legend()
+plt.xlabel(r'$k$ in px')
+plt.ylabel(r'$\langle I(n)I(n+k)\rangle/\langle I(n)^2\rangle$')
 plt.show()
 
+# %% [markdown] hidden=true
+# The correlation of Gaussian random variables for comparison:
+
+# %% hidden=true
+cor = 0
+nav = 500
+for i in range(nav):
+    x = np.random.normal(size=100)
+    cor += correlate(x,x)
+plt.plot(cor[len(cor)//2:]/nav)
+plt.show()
+
+# %% hidden=true
+# 2d correlation
+time = 10
+cor2d = signal.correlate2d(LEfinal[:,:,time], LEfinal[:,:,time])
+
+# %% code_folding=[] hidden=true
+fig = plt.figure(figsize=(15,10))
+
+lagx = np.arange(-cor2d.shape[1]//2,cor2d.shape[1]//2)
+lagy = np.arange(-cor2d.shape[0]//2,cor2d.shape[0]//2)
+X,Y = np.meshgrid(lagx,lagy)
+
+plt.pcolormesh(X, Y, cor2d/np.max(cor2d), cmap='gray', shading='auto')
+cbar = plt.colorbar()
+plt.show()
+
+# %% [markdown] hidden=true
+# There is no spatial correlation between the pixels.
+
+# %% [markdown] heading_collapsed=true
+# ## Time Correlation
+
+# %% [markdown] hidden=true
+# Time correlation calculated for each pixel and averaged over all pixels.
+
+# %% hidden=true
+LEcor = 0
+for x in range(LEfinal.shape[1]):
+    for y in range(LEfinal.shape[0]):
+        LEcor += correlate(LEfinal[y,x,:], LEfinal[y,x,:])
+        
+LEcor = LEcor[len(LEcor)//2:]/LEfinal.shape[0]/LEfinal.shape[1]
+
+TEcor = 0
+for x in range(TEfinal.shape[1]):
+    for y in range(TEfinal.shape[0]):
+        TEcor += correlate(TEfinal[y,x,:], TEfinal[y,x,:])
+        
+TEcor = TEcor[len(TEcor)//2:]/TEfinal.shape[0]/TEfinal.shape[1]
+
+# %% hidden=true
+plt.plot(np.arange(len(LEcor))/fps, LEcor, label='LE')
+plt.plot(np.arange(len(TEcor))/fps, TEcor, label='TE')
+plt.legend()
+plt.xlabel(r'$\Delta t$ in s')
+plt.ylabel(r'$\langle I(t)I(t+\Delta t)\rangle/\langle I(t)^2\rangle$')
+plt.show()
+
+# %% [markdown] hidden=true
+# LE: Small correlation in time.
+#
+# TE: Uncorrelated.
+
+# %% hidden=true
+# just for one pixel (no averages)
+x = 10; y=50
+cor = correlate(LEfinal[y,x,:], LEfinal[y,x,:])
+plt.plot(np.arange(len(cor[len(cor)//2:]))/fps, cor[len(cor)//2:])
+plt.show()
+
+# %% code_folding=[] hidden=true
+
+# %% code_folding=[] hidden=true
+
+# %% hidden=true
+
+# %% [markdown] heading_collapsed=true
+# ## Spectrum
+
+# %% [markdown] hidden=true
+# The spectrum is calculated for each pixel separately and then averaged over all pixels.
+
+# %% code_folding=[] hidden=true
+# calculate mean spectrum (mean over the spectrum of each pixel)
+yf = np.fft.rfftn(LEfinal, axes=[2])
+
+LENbin = len(yf[0,0])
+LExf = np.fft.fftfreq(LENbin, 1/fps)
+
+print(yf.shape, LENbin)
+
+LEspec = np.mean(np.mean(np.abs(yf[:,:,0:LENbin//2]), axis=1), axis=0)
+
+yf = np.fft.rfftn(TEfinal, axes=[2])
+
+TENbin = len(yf[0,0])
+TExf = np.fft.fftfreq(TENbin, 1/fps)
+
+print(yf.shape, TENbin)
+
+TEspec = np.mean(np.mean(np.abs(yf[:,:,0:TENbin//2]), axis=1), axis=0)
+
+# %% code_folding=[] hidden=true
+# plot
+fig, ax = plt.subplots(figsize=(12,8))
+ax.plot(LExf[0:LENbin//2], LEspec, label='LE')
+ax.plot(TExf[0:TENbin//2], TEspec, label='TE')
+ax.tick_params(axis='both', labelsize=15)
+ax.set_xlabel('$f$ in Hz', fontsize=25)
+ax.set_ylabel('spectrum in a.u.', fontsize=25)
+ax.legend(fontsize=25)
+ax.semilogx()
+plt.show()
+
+# %% [markdown] hidden=true
+# Not pure white noise ...
+
 # %% code_folding=[0] hidden=true
+
+# %% code_folding=[0] hidden=true
+
+# %% hidden=true
+
+# %% [markdown] heading_collapsed=true
+# ## Some Old Stuff
+
+# %% hidden=true
 # spatial correlation (in y direction; averaged over x direction)
 y0 = [0,25,50,75,100,125]
 
@@ -351,23 +502,17 @@ ax.set_xlim(-1, LEdata2.shape[0]-max(y0))
 
 plt.show()
 
-# %% [markdown] heading_collapsed=true
-# ## Time Correlation
-
-# %% [markdown] hidden=true
-# Time correlation calculated for each pixel and averaged over all pixels.
-
-# %% code_folding=[0] hidden=true
+# %% hidden=true
 # time correlation
-LEcor = np.mean(np.mean(LEdata2[:,:,0].T*LEdata2[:,:,:].T, axis=1), axis=1)
-TEcor = np.mean(np.mean(TEdata2[:,:,0].T*TEdata2[:,:,:].T, axis=1), axis=1)
+LEcor = np.mean(np.mean(LEfinal[:,:,0].T*LEfinal[:,:,:].T, axis=1), axis=1)
+TEcor = np.mean(np.mean(TEfinal[:,:,0].T*TEfinal[:,:,:].T, axis=1), axis=1)
 
-# %% code_folding=[0] hidden=true
+# %% hidden=true
 # plot
 fig, ax = plt.subplots(figsize=(12,8))
 
-ax.plot(np.arange(LEdata2.shape[2])/fps, LEcor/LEcor[0], label='LE')
-ax.plot(np.arange(TEdata2.shape[2])/fps, TEcor/TEcor[0], label='TE')
+ax.plot(np.arange(LEfinal.shape[2])/fps, LEcor/LEcor[0], label='LE')
+ax.plot(np.arange(TEfinal.shape[2])/fps, TEcor/TEcor[0], label='TE')
     
 ax.axhline(0.0, linewidth=1.0, color='k')
 
@@ -376,64 +521,6 @@ ax.tick_params(axis='both', labelsize=15)
 ax.legend(fontsize=25)
 
 ax.set_xlabel('$t$ in s', fontsize=25)
-ax.set_ylabel(r'$\langle I(0)I(t)\rangle$', fontsize=25)
+ax.set_ylabel(r'$\langle I(0)I(t)\rangle/\langle I(0)^2\rangle$', fontsize=25)
 
 plt.show()
-
-# %% hidden=true
-
-# %% [markdown] heading_collapsed=true
-# ## Spectrum
-
-# %% [markdown] hidden=true
-# The spectrum is calculated for each pixel separately and then averaged over all pixels.
-
-# %% code_folding=[0] hidden=true
-# calculate mean spectrum (mean over the spectrum of each pixel)
-yf = np.fft.rfftn(LEdata2, axes=[2])
-
-LENbin = len(yf[0,0])
-LExf = np.fft.fftfreq(LENbin, 1/fps)
-
-print(yf.shape, LENbin)
-
-LEspec = np.mean(np.mean(np.abs(yf[:,:,0:LENbin//2]), axis=1), axis=0)
-
-yf = np.fft.rfftn(TEdata2, axes=[2])
-
-TENbin = len(yf[0,0])
-TExf = np.fft.fftfreq(TENbin, 1/fps)
-
-print(yf.shape, TENbin)
-
-TEspec = np.mean(np.mean(np.abs(yf[:,:,0:TENbin//2]), axis=1), axis=0)
-
-# %% code_folding=[0] hidden=true
-# plot
-fig, ax = plt.subplots(figsize=(12,8))
-
-ax.plot(LExf[0:LENbin//2], LEspec, label='LE')
-ax.plot(TExf[0:TENbin//2], TEspec, label='TE')
-
-ax.tick_params(axis='both', labelsize=15)
-
-ax.set_xlabel('$f$ in Hz', fontsize=25)
-ax.set_ylabel('spectrum in a.u.', fontsize=25)
-
-ax.legend(fontsize=25)
-
-ax.set_xlim(-0.5, 10)
-
-plt.show()
-
-# %% hidden=true
-
-# %% code_folding=[0] hidden=true
-
-# %% code_folding=[0] hidden=true
-
-# %% hidden=true
-
-# %% hidden=true
-
-# %% hidden=true
