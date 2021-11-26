@@ -34,7 +34,7 @@ def load_nd_data(inname, startframe=0, endframe=-1, verbose=False, nth=1):
             print("\nheight = {}, width = {}, nframes = {}".format(height, width, nframes))
         
         if endframe == -1:
-            end = len(rawimages)
+            end = nframes
         else:
             if endframe < nframes:
                 end = endframe
@@ -43,8 +43,8 @@ def load_nd_data(inname, startframe=0, endframe=-1, verbose=False, nth=1):
                 print("endframe < len(rawimages)")
     
         # Y x X x N
-        #data = np.zeros((height, width, end))
-        data = np.zeros((height, width, (end-startframe)//nth+1))
+        tmp = -((end-startframe)//-nth)
+        data = np.zeros((height, width, tmp))
     
         #data = rawimages
         #print(np.mean(data)
