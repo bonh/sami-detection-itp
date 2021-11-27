@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 # ---
 # jupyter:
 #   jupytext:
@@ -6,9 +7,9 @@
 #       extension: .py
 #       format_name: percent
 #       format_version: '1.3'
-#       jupytext_version: 1.10.2
+#       jupytext_version: 1.12.0
 #   kernelspec:
-#     display_name: Python 3
+#     display_name: Python 3 (ipykernel)
 #     language: python
 #     name: python3
 # ---
@@ -19,6 +20,51 @@
 # Author:       Lukas Hecht (hecht@fkp.tu-darmstadt.de)
 #
 # Date:         November 26, 2021
+
+# %%
+import helper, dataprep
+import numpy as np
+import matplotlib.pyplot as plt
+import scipy
+
+channel_lower = 27
+channel_upper = 27
+
+inname = "/home/cb51neqa/projects/itp/exp_data/ITP_AF647_5µA/AF_10ng_l/001.nd2"
+data_raw = helper.raw2images(inname, (channel_lower, channel_upper))
+
+fig, axs = plt.subplots(2,1)
+
+s = dataprep.standardize(data_raw[:,:,:30].flatten())
+
+x = np.linspace(0, len(s), len(s))
+
+from scipy import signal
+f, Pxx_den = signal.periodogram(s)
+axs[0].semilogy(f[1:], Pxx_den[1:]) # remove zero frequency due to mean not exactly zero
+axs[0].set_xlabel('frequency')
+axs[0].set_ylabel('power')
+axs[0].set_xticks([])
+axs[0].set_yticks([])
+
+_, bins, _ = axs[1].hist(s, bins="auto", density=1, alpha=0.5)
+p1, p2, p3 = scipy.stats.skewnorm.fit(s)
+mean, var, skew, kurt = scipy.stats.skewnorm.stats(p1, p2, p3, moments='mvsk')
+#print(mean, var, skew, kurt)
+best_fit_line = scipy.stats.skewnorm.pdf(bins, p1, p2, p3)
+axs[1].plot(bins, best_fit_line);
+
+#values = scipy.stats.skewnorm.rvs(p1, p2, p3, 100000)
+#axs[1].hist(values, bins="auto", density=1, alpha=0.5)
+
+p1, p2 = scipy.stats.norm.fit(s)
+best_fit_line = scipy.stats.norm.pdf(bins, p1, p2)
+axs[1].plot(bins, best_fit_line);
+
+axs[1].set_xlabel('intensity')
+axs[1].set_ylabel('density')
+axs[1].set_xticks([]);
+axs[1].set_yticks([]);
 
 # %% [markdown] heading_collapsed=true
 # ## Import Modules
