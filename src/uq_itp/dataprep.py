@@ -34,7 +34,7 @@ def load_nd_data(inname, startframe=0, endframe=-1, verbose=False, nth=1):
             print("\nheight = {}, width = {}, nframes = {}".format(height, width, nframes))
         
         if endframe == -1:
-            end = len(rawimages)
+            end = nframes
         else:
             if endframe < nframes:
                 end = endframe

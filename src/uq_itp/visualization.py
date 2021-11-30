@@ -30,21 +30,20 @@ import dataprep
 import bayesian
 
 # +
-mpl.rcParams['figure.dpi'] = 300
+#mpl.rcParams['figure.dpi'] = 300
 
 #mpl.rcParams['text.usetex'] = True
 #mpl.rcParams['text.latex.preamble'] = r'\usepackage{mathtools}'
-plt.style.use(['science', 'notebook'])
+#plt.style.use(['science', 'notebook'])
 
 # +
-#inname = "/home/cb51neqa/projects/itp/exp_data/ITP_AF647_5µA/AF_10ng_l/001.nd2"
-inname = "/home/cb51neqa/projects/itp/exp_data/2021-11-16/5µA/AF647_0ng_l/004.nd2"
+inname = "/home/cb51neqa/projects/itp/exp_data/ITP_AF647_5µA/AF_0.1ng_l/002.nd2"
 
 channel_lower = 27
 channel_upper = 27
 
-startframe = 200
-endframe = 350
+startframe = 100
+endframe = 250
 
 fps = 46 # frames per second (1/s)
 px = 1.6e-6 # size of pixel (m/px)
@@ -89,6 +88,8 @@ corr_mean = dataprep.standardize(corr_mean)
 window = 7
 corr_mean_smoothed = dataprep.simplemovingmean(corr_mean, window, beta=6)
 x_lag_smoothed = x_lag[int(window/2):-int(window/2)]
+
+plt.plot(corr_mean_smoothed)
 
 with bayesian.signalmodel_correlation(corr_mean_smoothed, -x_lag_smoothed, px, lagstep, fps) as model:
     trace = pm.sample(return_inferencedata=False, cores=4, target_accept=0.9)
