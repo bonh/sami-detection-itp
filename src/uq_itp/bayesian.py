@@ -28,11 +28,11 @@ def signalmodel_correlation(data, x, px, lagstep, fps):
         # background
         # f = b*x + c
         #aa = pm.Normal("a", 0, 0.0001)
-        #b = pm.Normal('b', 0, 1)
+        b = pm.Normal('b', 0, 1)
         c = pm.Normal('c', 0, 1)
         
-        #background = pm.Deterministic("background", b*x+c)
-        background = pm.Deterministic("background", c)
+        background = pm.Deterministic("background", b*x+c)
+        #background = pm.Deterministic("background", c)
 
         # sample peak
         amp = pm.HalfNormal('amplitude', 20) 

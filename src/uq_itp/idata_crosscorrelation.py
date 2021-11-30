@@ -11,6 +11,22 @@ import dataprep
 import bayesian
 import helper
 
+class MyCallback:
+    def __init__(self, model, every=1000, max_rhat=1.05):
+        self.model = model
+        self.every = every
+        self.max_rhat = max_rhat
+        self.traces = {}
+        self.uptodate = [False, False, False, False]
+        self.count = 0
+
+    def __call__(self, trace, draw):
+        if draw.tuning:
+            return
+        self.count += int(draw.stats[0]['diverging'])
+        if self.count > 10:
+            raise RuntimeError
+
 def main(inname, channel, lagstep, px, fps, rope_velocity):
     data_raw = helper.raw2images(inname, channel)
 
@@ -24,8 +40,14 @@ def main(inname, channel, lagstep, px, fps, rope_velocity):
     lagstep = 30 
     corr = dataprep.correlate_frames(data, lagstep)
     corr = dataprep.standardize(corr)
-            
-    def functional(startframe, delta):
+
+    delta = 150
+    def functional(parameters):
+        startframe = parameters["start"]
+        #delta = parameters["delta"]
+
+        print(startframe, delta)
+
         corr_mean = np.mean(corr[:,startframe:startframe+delta], axis=1)
         
         x_lag = np.linspace(-corr_mean.shape[0]/2, corr_mean.shape[0]/2, corr_mean.shape[0])
@@ -42,13 +64,16 @@ def main(inname, channel, lagstep, px, fps, rope_velocity):
         x_lag_smoothed = x_lag[int(window/2):-int(window/2)]
 
         with bayesian.signalmodel_correlation(corr_mean_smoothed, -x_lag_smoothed, px, lagstep, fps) as model:
-            trace = pm.sample(4000, return_inferencedata=False, cores=4, target_accept=0.9)
-         
-            idata = az.from_pymc3(trace=trace, model=model) 
+            try:
+                trace = pm.sample(2000, return_inferencedata=False, cores=4, target_accept=0.9, callback=MyCallback(model,every=1000))
+            except RuntimeError:
+                return -1e5
+
+        idata = az.from_pymc3(trace=trace, model=model) 
         
         hdi_velocity = az.hdi(idata, var_names=["velocity"])["velocity"]
-        result = 1/2*np.sqrt(
-            (hdi_velocity[1] - hdi_velocity[0])**2)
+        s = hdi_velocity[1] - hdi_velocity[0]
+        result = -1/2*np.sqrt(s**2)# + 1e-4*delta
         result = result.item()
 
         v = bayesian.get_mode(idata.posterior, ["velocity"])[0]*1e-6
@@ -56,19 +81,18 @@ def main(inname, channel, lagstep, px, fps, rope_velocity):
 
         return result
 
-    def functional2(para):
-        return -functional(para["start"], para["delta"])
-
-    search_space = {"start": np.arange(0, 200, 10), "delta": np.arange(10, 200, 10)}
+    #search_space = {"start": np.arange(0, 200, 10), "delta": np.arange(0, 200, 10)}
+    search_space = {"start": np.arange(0, 200, 10)}
 
     #opt = RandomSearchOptimizer(search_space)
-    #opt = BayesianOptimizer(search_space)
-    opt = EvolutionStrategyOptimizer(search_space)
+    opt = BayesianOptimizer(search_space)
+    #opt = EvolutionStrategyOptimizer(search_space)
     #opt = SimulatedAnnealingOptimizer(search_space)
-    opt.search(functional2, n_iter=20, early_stopping={"n_iter_no_change":5})
+    opt.search(functional, n_iter=20, early_stopping={"n_iter_no_change":5})
 
     startframe = opt.best_para["start"]
-    endframe = startframe + opt.best_para["delta"]
+    #endframe = startframe + opt.best_para["delta"]
+    endframe = startframe + delta
 
     corr_mean = np.mean(corr[:,startframe:endframe], axis=1)
         
