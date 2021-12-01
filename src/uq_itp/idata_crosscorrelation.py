@@ -65,7 +65,7 @@ def main(inname, channel, lagstep, px, fps, rope_velocity):
 
         with bayesian.signalmodel_correlation(corr_mean_smoothed, -x_lag_smoothed, px, lagstep, fps) as model:
             try:
-                trace = pm.sample(2000, return_inferencedata=False, cores=4, target_accept=0.9, callback=MyCallback(model,every=1000))
+                trace = pm.sample(4000, tune=2000, return_inferencedata=False, cores=4, target_accept=0.9, callback=MyCallback(model,every=1000))
             except RuntimeError:
                 return -1e5
 
