@@ -42,8 +42,8 @@ inname = "/home/cb51neqa/projects/itp/exp_data/ITP_AF647_5µA/AF_0.1ng_l/002.nd2
 channel_lower = 27
 channel_upper = 27
 
-startframe = 100
-endframe = 250
+startframe = 120
+endframe = 270
 
 fps = 46 # frames per second (1/s)
 px = 1.6e-6 # size of pixel (m/px)
@@ -89,10 +89,8 @@ window = 7
 corr_mean_smoothed = dataprep.simplemovingmean(corr_mean, window, beta=6)
 x_lag_smoothed = x_lag[int(window/2):-int(window/2)]
 
-plt.plot(corr_mean_smoothed)
-
 with bayesian.signalmodel_correlation(corr_mean_smoothed, -x_lag_smoothed, px, lagstep, fps) as model:
-    trace = pm.sample(return_inferencedata=False, cores=4, target_accept=0.9)
+    trace = pm.sample(tune=2000, return_inferencedata=False, cores=4, target_accept=0.9)
       
     ppc = pm.fast_sample_posterior_predictive(trace, model=model)
     idata = az.from_pymc3(trace=trace, posterior_predictive=ppc, model=model) 
@@ -117,10 +115,8 @@ x = np.linspace(0, len(data_mean), len(data_mean))
 x_smoothed = x[int(window/2):-int(window/2)]
 # -
 
-plt.plot(data_mean_smoothed)
-
 with bayesian.signalmodel(data_mean_smoothed, x_smoothed) as model:
-    trace2 = pm.sample(return_inferencedata=False, cores=4, target_accept=0.9)
+    trace2 = pm.sample(tune=2000, return_inferencedata=False, cores=4, target_accept=0.9)
     
     ppc2 = pm.fast_sample_posterior_predictive(trace2, model=model)
     idata2 = az.from_pymc3(trace=trace2, posterior_predictive=ppc2, model=model) 
@@ -132,7 +128,7 @@ window = 7
 data_smoothed = dataprep.simplemovingmean(data[:,time], window, beta=6)
 
 with bayesian.signalmodel(data_smoothed, x_smoothed) as model:
-    trace3 = pm.sample(4000, return_inferencedata=False, cores=4, target_accept=0.9)
+    trace3 = pm.sample(tune=2000, return_inferencedata=False, cores=4, target_accept=0.9)
       
     ppc3 = pm.fast_sample_posterior_predictive(trace3, model=model)
     idata3 = az.from_pymc3(trace=trace3, posterior_predictive=ppc3, model=model) 
@@ -176,7 +172,7 @@ plt.setp(ax1.get_xticklabels(), visible=False);
 #
 #ax5.set_yticks(np.linspace(0, corr[0:int(corr.shape[0]/2),:].T.shape[0], 3))
 
-ax6 = fig.add_subplot(gs[2, 0:2], sharex=ax5)
+ax6 = fig.add_subplot(gs[2, 0:2])
 ax6.plot(x_lag, corr_mean, alpha=0.8)
 ax6.plot(x_lag_smoothed, idata.posterior_predictive.mean(("chain", "draw"))["y"], label="fit")
 ax6.fill_between(x_lag_smoothed, hdi["y"][:,0], hdi["y"][:,1], alpha=0.2, label=".95 HDI")
@@ -187,7 +183,7 @@ ax6.set_xticks(np.linspace(-length/2, 0, 5))
 ax6.set_yticks(np.linspace(0, np.ceil(np.max(corr_mean)), 3))
 
 #plt.setp(ax4.get_xticklabels(), visible=False);
-plt.setp(ax5.get_xticklabels(), visible=False);
+#plt.setp(ax5.get_xticklabels(), visible=False);
 
 #
 ax7 = fig.add_subplot(gs[3, 1:2])
@@ -262,4 +258,6 @@ plt.setp(ax1.get_yticklabels(), visible=False);
 #
 fig.align_ylabels()
 # -
+
+
 
