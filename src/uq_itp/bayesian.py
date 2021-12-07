@@ -19,6 +19,10 @@ def check_rope(values, rope):
     prob = ((values > rope[0]) & (values <= rope[1])).mean()
     return prob.data
 
+def check_refvalue(values, refvalue):
+    prob = (values > refvalue).mean()
+    return prob.data
+
 def get_mode(data, var_names):
     _, vals = az.sel_utils.xarray_to_ndarray(data, var_names=var_names)
     return [az.plots.plot_utils.calculate_point_estimate("mode", val) for val in vals]
@@ -75,10 +79,11 @@ def signalmodel(data, x):
         background = pm.Deterministic("background", b*x+c)
 
         # sample peak
-        amp = pm.HalfNormal('amplitude', 50)
+        amp = pm.HalfNormal('amplitude', 5)
         cent = pm.Uniform('centroid', 0, len(data))
-        sig = pm.Deterministic("sigma", pm.Beta('beta', 2, 2)*20)# TODO: calculate from physics?
-        alpha = pm.Normal("alpha", 0, 10)
+        sig = pm.HalfNormal('sigma', 20) # TODO: calculate from physics?
+        #sig = pm.Deterministic("sigma", pm.Beta('beta', 2, 2)*20)# TODO: calculate from physics?
+        alpha = pm.Normal("alpha", 0, 1e-2)
         
         sample = pm.Deterministic("sample", model_sample(amp, cent, sig, alpha, x))
         
