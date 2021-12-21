@@ -27,21 +27,19 @@ class MyCallback:
         if self.count > 10:
             raise RuntimeError
 
-def main(inname, channel, lagstep, px, fps, rope_velocity):
-    data_raw = helper.raw2images(inname, channel)
+def main(inname, channel, lagstep, px, fps, data_raw=None, startframe=None, delta=None, artificial=False):
+    if inname and channel:
+        data_raw = helper.raw2images(inname, channel)
 
-    height = data_raw.shape[0]
-    length = data_raw.shape[1]
-    nframes = data_raw.shape[2]
-
-    data = dataprep.averageoverheight(data_raw)
+    if len(data_raw.shape) > 2:
+        data = dataprep.averageoverheight(data_raw)
+    else:
+        data = data_raw
     data = dataprep.standardize(data)
 
-    lagstep = 30 
     corr = dataprep.correlate_frames(data, lagstep)
     corr = dataprep.standardize(corr)
 
-    delta = 150
     def functional(parameters):
         startframe = parameters["start"]
         #delta = parameters["delta"]
@@ -59,11 +57,14 @@ def main(inname, channel, lagstep, px, fps, rope_velocity):
 
         corr_mean = dataprep.standardize(corr_mean)
 
-        window = 7
-        corr_mean_smoothed = dataprep.simplemovingmean(corr_mean, window, beta=6)
-        x_lag_smoothed = x_lag[int(window/2):-int(window/2)]
+        #window = 7
+        #corr_mean_smoothed = dataprep.simplemovingmean(corr_mean, window, beta=6)
+        #x_lag_smoothed = x_lag[int(window/2):-int(window/2)]
+        corr_mean_smoothed = corr_mean
+        x_lag_smoothed = x_lag
 
-        with bayesian.signalmodel_correlation(corr_mean_smoothed, -x_lag_smoothed, px, lagstep, fps) as model:
+        print(artificial)
+        with bayesian.signalmodel_correlation(corr_mean_smoothed, -x_lag_smoothed, px, lagstep, fps, artificial=artificial) as model:
             try:
                 trace = pm.sample(4000, tune=2000, return_inferencedata=False, cores=4, target_accept=0.9, callback=MyCallback(model,every=1000))
             except RuntimeError:
@@ -81,18 +82,23 @@ def main(inname, channel, lagstep, px, fps, rope_velocity):
 
         return result
 
-    #search_space = {"start": np.arange(0, 200, 10), "delta": np.arange(0, 200, 10)}
-    search_space = {"start": np.arange(0, 200, 10)}
+    if not startframe and not delta:  
+        delta = 150
+            
+        #search_space = {"start": np.arange(0, 200, 10), "delta": np.arange(0, 200, 10)}
+        search_space = {"start": np.arange(0, 200, 10)}
 
-    #opt = RandomSearchOptimizer(search_space)
-    opt = BayesianOptimizer(search_space)
-    #opt = EvolutionStrategyOptimizer(search_space)
-    #opt = SimulatedAnnealingOptimizer(search_space)
-    opt.search(functional, n_iter=20, early_stopping={"n_iter_no_change":5})
+        #opt = RandomSearchOptimizer(search_space)
+        opt = BayesianOptimizer(search_space)
+        #opt = EvolutionStrategyOptimizer(search_space)
+        #opt = SimulatedAnnealingOptimizer(search_space)
+        opt.search(functional, n_iter=20, early_stopping={"n_iter_no_change":5})
 
-    startframe = opt.best_para["start"]
-    #endframe = startframe + opt.best_para["delta"]
+        startframe = opt.best_para["start"]
+        #endframe = startframe + opt.best_para["delta"]
+        
     endframe = startframe + delta
+    print(startframe, endframe)
 
     corr_mean = np.mean(corr[:,startframe:endframe], axis=1)
         
@@ -109,7 +115,7 @@ def main(inname, channel, lagstep, px, fps, rope_velocity):
     corr_mean_smoothed = dataprep.simplemovingmean(corr_mean, window, beta=6)
     x_lag_smoothed = x_lag[int(window/2):-int(window/2)]
 
-    with bayesian.signalmodel_correlation(corr_mean_smoothed, -x_lag_smoothed, px, lagstep, fps) as model:
+    with bayesian.signalmodel_correlation(corr_mean_smoothed, -x_lag_smoothed, px, lagstep, fps, artificial=artificial) as model:
         trace = pm.sample(4000, return_inferencedata=False, cores=4, target_accept=0.9)
      
         ppc = pm.fast_sample_posterior_predictive(trace, model=model)
@@ -119,7 +125,7 @@ def main(inname, channel, lagstep, px, fps, rope_velocity):
 
 if __name__ == "__main__":
 
-    basepath = "/home/cb51neqa/projects/itp/exp_data/"
+    basepath = "/home/cb51neqa/projects/itp/exp_data/2021-12-20/5µA"
 
     innames = []
     for root, dirs, files in os.walk(basepath):
@@ -128,7 +134,7 @@ if __name__ == "__main__":
                 if(f.endswith(".nd2")):
                     innames.append(os.path.join(root,f))
 
-    #innames = list(filter(lambda inname: "AF_0ng" in inname, innames))
+    innames = list(filter(lambda inname: "10ng_l" in inname, innames))
     #innames = innames[20:]
     #innames = innames[-5:-1]
     #pprint(innames)
@@ -140,8 +146,6 @@ if __name__ == "__main__":
     channel = [27, 27]
     lagstep = 30
 
-    rope_velocity = (220,260)
-
     titles, detected = [], []
 
     results = np.empty((len(innames), 2))
@@ -151,7 +155,7 @@ if __name__ == "__main__":
         while True:
             #try:
             print(inname)
-            idata_cross, min_, max_ = main(inname, channel, lagstep, px, fps, rope_velocity)
+            #idata_cross, min_, max_ = main(inname, channel, lagstep, px, fps)
             #except:
             #    if j<3:
             #        print("retry")
@@ -164,6 +168,8 @@ if __name__ == "__main__":
             number = number.replace(".nd2", "")
             folder = (inname.split("/")[-2])
 
+            print(folder)
+
             folder = folder + "/" + number
 
             from pathlib import Path
@@ -174,6 +180,5 @@ if __name__ == "__main__":
                 f.write("{}\t{}".format(min_, max_))
             
             print(folder+"/idata_cross.nc")
-
 
             break
