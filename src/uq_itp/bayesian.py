@@ -27,20 +27,22 @@ def get_mode(data, var_names):
     _, vals = az.sel_utils.xarray_to_ndarray(data, var_names=var_names)
     return [az.plots.plot_utils.calculate_point_estimate("mode", val) for val in vals]
 
-def signalmodel_correlation(data, x, px, lagstep, fps):
+def signalmodel_correlation(data, x, px, lagstep, fps, artificial=False):
     with pm.Model() as model:
         # background
         # f = b*x + c
         #aa = pm.Normal("a", 0, 0.0001)
-        b = pm.Normal('b', 0, 1)
         c = pm.Normal('c', 0, 1)
-        
-        background = pm.Deterministic("background", b*x+c)
-        #background = pm.Deterministic("background", c)
+        if not artificial:
+            b = pm.Normal('b', 0, 1)
+            background = pm.Deterministic("background", b*x+c)
+        else:
+            background = pm.Deterministic("background", c)
 
         # sample peak
-        amp = pm.HalfNormal('amplitude', 20) 
-        cent = pm.Uniform('centroid', 0, len(data))
+        amp = pm.HalfNormal('amplitude', 20)
+        measure = pm.Uniform("measure", 0, 1)
+        cent = pm.Deterministic('centroid', measure*len(data))
         sig = pm.HalfNormal('sigma', 50) # TODO: calculate from physics?
         #alpha = pm.Normal("alpha", 0, 0.1)
 
@@ -67,23 +69,26 @@ def signalmodel_correlation(data, x, px, lagstep, fps):
 def model_sample(a, c, w, alpha, x):       
     return a*tt.exp(-(c - x)**2/2/w**2) * (1-tt.erf((alpha*(c - x))/tt.sqrt(2)/w))
 
-def signalmodel(data, x):
+def signalmodel(data, x, artificial=False):
     with pm.Model() as model:
         # background
         # f = c
         c = pm.Normal('c', 0, 1)
-        b = pm.Normal('b', 0, 1)
-        #d = pm.Normal('d', 0, 1)
-        
-        #background = pm.Deterministic("background", d*x**2+b*x+c)
-        background = pm.Deterministic("background", b*x+c)
+        if not artificial:
+            b = pm.Normal('b', 0, 1)
+            #d = pm.Normal('d', 0, 1)
+            #background = pm.Deterministic("background", d*x**2+b*x+c)
+            background = pm.Deterministic("background", b*x+c)
+        else:
+            background = pm.Deterministic("background", c)
 
         # sample peak
         amp = pm.HalfNormal('amplitude', 5)
-        cent = pm.Uniform('centroid', 0, len(data))
+        measure = pm.Uniform("measure", 0, 1)
+        cent = pm.Deterministic('centroid', measure*len(data))
         sig = pm.HalfNormal('sigma', 20) # TODO: calculate from physics?
         #sig = pm.Deterministic("sigma", pm.Beta('beta', 2, 2)*20)# TODO: calculate from physics?
-        alpha = pm.Normal("alpha", 0, 1e-2)
+        alpha = pm.Normal("alpha", 0, 1)
         
         sample = pm.Deterministic("sample", model_sample(amp, cent, sig, alpha, x))
         
