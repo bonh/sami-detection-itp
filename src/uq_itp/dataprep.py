@@ -72,10 +72,20 @@ def averageoverheight(data):
     return np.mean(data, axis=0)
 
 def shift_data(data, v, fps, px):
-    dx =  v/fps
+    if fps and px:
+        v_px = v/(fps*px)
+    else:
+        v_px = v
+        
+    #offset = int(data.shape[0]/3)
+    offset = 0
+    
     data_shifted = np.zeros(data.shape)
+
     for i in range(0, data.shape[1]):
-        shift = data.shape[0] - int(i*dx/px)%data.shape[0]
+        shift = data.shape[0] - int(i*v_px)%data.shape[0] + offset
+        if shift-offset-data.shape[0] == 0:
+            print("shift is zero")
         data_shifted[:,i] = np.roll(data[:,i], shift)
     
     #data_shifted = np.roll(data_shifted, int(data_shifted.shape[1]/2), axis=1)
