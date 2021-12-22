@@ -37,6 +37,18 @@ def main(inname, channel, lagstep, px, fps, data_raw=None, startframe=None, delt
         data = data_raw
     data = dataprep.standardize(data)
 
+    fft2 = np.fft.fft2(data)
+    
+    mask = np.zeros(data.shape)
+    for y, x in np.ndindex(mask.shape):
+        if x>0 and x < 30 and y > 490:
+            mask[y, x] = 1
+    
+    tmp = np.fft.ifft2(fft2*mask)
+    tmp = np.abs(tmp)
+    tmp = dataprep.standardize(tmp)
+    data = tmp
+
     corr = dataprep.correlate_frames(data, lagstep)
     corr = dataprep.standardize(corr)
 
@@ -57,16 +69,13 @@ def main(inname, channel, lagstep, px, fps, data_raw=None, startframe=None, delt
 
         corr_mean = dataprep.standardize(corr_mean)
 
-        #window = 7
-        #corr_mean_smoothed = dataprep.simplemovingmean(corr_mean, window, beta=6)
-        #x_lag_smoothed = x_lag[int(window/2):-int(window/2)]
-        corr_mean_smoothed = corr_mean
-        x_lag_smoothed = x_lag
+        window = 7
+        corr_mean_smoothed = dataprep.simplemovingmean(corr_mean, window, beta=6)
+        x_lag_smoothed = x_lag[int(window/2):-int(window/2)]
 
-        print(artificial)
         with bayesian.signalmodel_correlation(corr_mean_smoothed, -x_lag_smoothed, px, lagstep, fps, artificial=artificial) as model:
             try:
-                trace = pm.sample(4000, tune=2000, return_inferencedata=False, cores=4, target_accept=0.9, callback=MyCallback(model,every=1000))
+                trace = pm.sample(8000, tune=4000, return_inferencedata=False, cores=4, target_accept=0.9, callback=MyCallback(model,every=1000))
             except RuntimeError:
                 return -1e5
 
@@ -83,16 +92,16 @@ def main(inname, channel, lagstep, px, fps, data_raw=None, startframe=None, delt
         return result
 
     if not startframe and not delta:  
-        delta = 150
+        delta = 200
             
         #search_space = {"start": np.arange(0, 200, 10), "delta": np.arange(0, 200, 10)}
-        search_space = {"start": np.arange(0, 200, 10)}
+        search_space = {"start": np.arange(100, 300, 10)}
 
         #opt = RandomSearchOptimizer(search_space)
         opt = BayesianOptimizer(search_space)
         #opt = EvolutionStrategyOptimizer(search_space)
         #opt = SimulatedAnnealingOptimizer(search_space)
-        opt.search(functional, n_iter=20, early_stopping={"n_iter_no_change":5})
+        opt.search(functional, n_iter=20, early_stopping={"n_iter_no_change":5}, max_score=-4)
 
         startframe = opt.best_para["start"]
         #endframe = startframe + opt.best_para["delta"]
@@ -116,10 +125,11 @@ def main(inname, channel, lagstep, px, fps, data_raw=None, startframe=None, delt
     x_lag_smoothed = x_lag[int(window/2):-int(window/2)]
 
     with bayesian.signalmodel_correlation(corr_mean_smoothed, -x_lag_smoothed, px, lagstep, fps, artificial=artificial) as model:
-        trace = pm.sample(4000, return_inferencedata=False, cores=4, target_accept=0.9)
+        trace = pm.sample(8000, tune=4000, return_inferencedata=False, cores=4, target_accept=0.9)
      
         ppc = pm.fast_sample_posterior_predictive(trace, model=model)
-        idata = az.from_pymc3(trace=trace, posterior_predictive=ppc, model=model) 
+        prior_pc = pm.sample_prior_predictive(50000, model=model)
+        idata = az.from_pymc3(trace=trace, posterior_predictive=ppc, model=model, prior=prior_pc) 
 
     return idata, startframe, endframe 
 
@@ -134,7 +144,7 @@ if __name__ == "__main__":
                 if(f.endswith(".nd2")):
                     innames.append(os.path.join(root,f))
 
-    innames = list(filter(lambda inname: "10ng_l" in inname, innames))
+    #innames = list(filter(lambda inname: "10pg_l" in inname or "1pg_l" in inname, innames))
     #innames = innames[20:]
     #innames = innames[-5:-1]
     #pprint(innames)
@@ -153,22 +163,20 @@ if __name__ == "__main__":
     for inname in innames:
         j = 0
         while True:
-            #try:
-            print(inname)
-            #idata_cross, min_, max_ = main(inname, channel, lagstep, px, fps)
-            #except:
-            #    if j<3:
-            #        print("retry")
-            #        j+=1
-            #        continue
-            #    else:
-            #        break
+            try:
+                print(inname)
+                idata_cross, min_, max_ = main(inname, channel, lagstep, px, fps)
+            except:
+                if j<3:
+                    print("retry")
+                    j+=1
+                    continue
+                else:
+                    break
 
             number = (inname.split("_")[-1]).split("/")[-1]
             number = number.replace(".nd2", "")
             folder = (inname.split("/")[-2])
-
-            print(folder)
 
             folder = folder + "/" + number
 
