@@ -1,4 +1,7 @@
 import os
+import sys
+from os.path import expanduser
+import multiprocessing as mp
 from pprint import pprint
 import numpy as np
 from sklearn import preprocessing
@@ -34,16 +37,51 @@ def main(inname, channel, px, fps, rope_velocity, idata_cross, startframe, endfr
 
     x = np.linspace(0, len(data_mean), len(data_mean))
     with bayesian.signalmodel(data_mean, x, artificial=artificial) as model:
-        trace = pm.sample(4000, tune=2000, return_inferencedata=False, cores=4, target_accept=0.9)
+        trace = pm.sample(8000, tune=4000, return_inferencedata=False, chains=4, cores=1, target_accept=0.9)
     
         ppc = pm.fast_sample_posterior_predictive(trace, model=model)
         idata = az.from_pymc3(trace=trace, posterior_predictive=ppc, model=model) 
 
     return idata 
 
-if __name__ == "__main__":
+def run(inname, channel, px, fps, rope_velocity):
+   j = 0
+   while True:
+       try:
+           print(inname)
+           
+           number = (inname.split("_")[-1]).split("/")[-1]
+           number = number.replace(".nd2", "")
+           folder = (inname.split("/")[-2])
+           folder = folder + "/" + number
 
-    basepath = "/home/cb51neqa/projects/itp/exp_data/"
+           idata_cross = az.InferenceData.from_netcdf(folder+"/idata_cross.nc")
+                       
+           with open(folder+"/intervals.dat") as f:
+               min_, max_ = [int(x) for x in next(f).split()]
+
+           print(min_, max_)
+           idata = main(inname, channel, px, fps, rope_velocity, idata_cross, min_, max_)
+
+           idata.to_netcdf(folder+"/idata.nc")
+       except AttributeError as e:
+           print(e)
+           break
+       except Exception as e:
+           print(e)
+           if j<3:
+               print("retry")
+               j+=1
+               continue
+           else:
+               break
+
+       break
+
+
+if __name__ == "__main__":
+    home = expanduser("~")
+    basepath = home + "/projects/itp/exp_data/2021-12-20/5µA"
 
     innames = []
     for root, dirs, files in os.walk(basepath):
@@ -52,8 +90,8 @@ if __name__ == "__main__":
                 if(f.endswith(".nd2")):
                     innames.append(os.path.join(root,f))
 
-    innames = list(filter(lambda inname: "AF_1ng" in inname, innames))
-    innames = list(filter(lambda inname: "005" in inname, innames))
+    #innames = list(filter(lambda inname: "AF_1ng" in inname, innames))
+    #innames = list(filter(lambda inname: "005" in inname, innames))
     #innames = innames[20:]
     #innames = innames[-5:-1]
     #pprint(innames)
@@ -64,36 +102,11 @@ if __name__ == "__main__":
 
     channel = [27, 27]
 
-    rope_velocity = (200,300)
-    
-    for inname in innames:
-        j = 0
-        while True:
-            try:
-                print(inname)
-                
-                number = (inname.split("_")[-1]).split("/")[-1]
-                number = number.replace(".nd2", "")
-                folder = (inname.split("/")[-2])
-                folder = folder + "/" + number
+    rope_velocity = (100,200)
 
-                idata_cross = az.InferenceData.from_netcdf(folder+"/idata_cross.nc")
-                            
-                with open(folder+"/intervals.dat") as f:
-                    min_, max_ = [int(x) for x in next(f).split()]
+    cores = mp.cpu_count()
+    threads = int(cores)
 
-                print(min_, max_)
-                idata = main(inname, channel, px, fps, rope_velocity, idata_cross, min_, max_)
-
-                idata.to_netcdf(folder+"/idata.nc")
-            except AttributeError:
-                break
-            except:
-                if j<3:
-                    print("retry")
-                    j+=1
-                    continue
-                else:
-                    break
-
-            break
+    with mp.Pool(threads) as pool:
+        multiple_results = [pool.apply_async(run, (inname, channel, px, fps, rope_velocity)) for inname in innames]
+        print([res.get() for res in multiple_results])
