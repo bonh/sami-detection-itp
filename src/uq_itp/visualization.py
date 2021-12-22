@@ -37,20 +37,24 @@ import bayesian
 #plt.style.use(['science', 'notebook'])
 
 # +
-inname = "/home/cb51neqa/projects/itp/exp_data/ITP_AF647_5µA/AF_0.1ng_l/002.nd2"
+basepath = "/home/cb51neqa/projects/itp/exp_data/2021-12-20/5µA/"
+concentration = "AF647_10pg_l/"
+number = "005.nd2"
+inname = basepath + concentration + number
 
 channel_lower = 27
 channel_upper = 27
 
-startframe = 120
-endframe = 270
+startframe = 100
+endframe = 300
 
 fps = 46 # frames per second (1/s)
 px = 1.6e-6 # size of pixel (m/px)
 
 sigma_mean = 10
-rope_sigma = (5,15)
-rope_velocity = (200,250)
+rope_sigma = (6,10)
+rope_velocity = (120,180)
+snr_ref = 3
 
 time = 150
 # -
@@ -66,8 +70,21 @@ data = dataprep.averageoverheight(data_raw)
 data = dataprep.standardize(data)
 
 # +
+fft2 = np.fft.fft2(data)
+    
+mask = np.zeros(data.shape)
+for y, x in np.ndindex(mask.shape):
+    if x>0 and x < 30 and y > 490:
+        mask[y, x] = 1
+    
+tmp = np.fft.ifft2(fft2*mask)
+tmp = np.abs(tmp)
+tmp = dataprep.standardize(tmp)
+data_fft = tmp
+
+# +
 lagstep = 30 
-corr = dataprep.correlate_frames(data, lagstep)
+corr = dataprep.correlate_frames(data_fft, lagstep)
 
 corr = dataprep.standardize(corr)
 
@@ -116,7 +133,7 @@ x_smoothed = x[int(window/2):-int(window/2)]
 # -
 
 with bayesian.signalmodel(data_mean_smoothed, x_smoothed) as model:
-    trace2 = pm.sample(tune=2000, return_inferencedata=False, cores=4, target_accept=0.9)
+    trace2 = pm.sample(4000, tune=2000, return_inferencedata=False, cores=4, target_accept=0.9)
     
     ppc2 = pm.fast_sample_posterior_predictive(trace2, model=model)
     idata2 = az.from_pymc3(trace=trace2, posterior_predictive=ppc2, model=model) 
@@ -128,7 +145,7 @@ window = 7
 data_smoothed = dataprep.simplemovingmean(data[:,time], window, beta=6)
 
 with bayesian.signalmodel(data_smoothed, x_smoothed) as model:
-    trace3 = pm.sample(tune=2000, return_inferencedata=False, cores=4, target_accept=0.9)
+    trace3 = pm.sample(4000, tune=2000, return_inferencedata=False, cores=4, target_accept=0.9)
       
     ppc3 = pm.fast_sample_posterior_predictive(trace3, model=model)
     idata3 = az.from_pymc3(trace=trace3, posterior_predictive=ppc3, model=model) 
@@ -229,13 +246,13 @@ ax9.legend()
 
 #
 ax10 = fig.add_subplot(gs[2, 4:5])
-axs = az.plot_posterior(idata3, var_names=["snr"], kind="hist", point_estimate='mean', hdi_prob=.95, ax=ax10, textsize=10);
+axs = az.plot_posterior(idata3, var_names=["snr"], kind="hist", point_estimate='mean', hdi_prob=.95, ax=ax10, textsize=10, ref_val=snr_ref);
 axs.set_title("")
 ax10.set_title("H (signal-to-noise)", loc="left")
 axs.set_xlabel("single frame")
 
 ax11 = fig.add_subplot(gs[2, 5:6])
-axs = az.plot_posterior(idata2, var_names=["snr"], kind="hist", point_estimate='mean', hdi_prob=.95, ax=ax11, textsize=10);
+axs = az.plot_posterior(idata2, var_names=["snr"], kind="hist", point_estimate='mean', hdi_prob=.95, ax=ax11, textsize=10, ref_val=snr_ref);
 axs.set_title("")
 axs.set_xlabel("avg. frames")
 #
@@ -258,6 +275,4 @@ plt.setp(ax1.get_yticklabels(), visible=False);
 #
 fig.align_ylabels()
 # -
-
-
 
