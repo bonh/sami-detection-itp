@@ -1,4 +1,6 @@
 import os
+import sys
+import multiprocessing as mp
 from pprint import pprint
 import numpy as np
 from sklearn import preprocessing
@@ -133,6 +135,39 @@ def main(inname, channel, lagstep, px, fps, data_raw=None, startframe=None, delt
 
     return idata, startframe, endframe 
 
+def run(inname, channel, lagstep, px, fps):
+    sys.stdout = open(str(os.getpid()) + ".out", "w")
+    sys.stderr = open(str(os.getpid()) + ".err", "w")
+    j = 0
+    while True:
+        try:
+            print(inname)
+            idata_cross, min_, max_ = main(inname, channel, lagstep, px, fps)
+        except:
+            if j<3:
+                print("retry")
+                j+=1
+                continue
+            else:
+                break
+
+        number = (inname.split("_")[-1]).split("/")[-1]
+        number = number.replace(".nd2", "")
+        folder = (inname.split("/")[-2])
+
+        folder = folder + "/" + number
+
+        from pathlib import Path
+        Path(folder).mkdir(parents=True, exist_ok=True)
+
+        idata_cross.to_netcdf(folder+"/idata_cross.nc")
+        with open(folder+"/intervals.dat", 'w') as f:
+            f.write("{}\t{}".format(min_, max_))
+        
+        print(folder+"/idata_cross.nc")
+
+        break
+
 if __name__ == "__main__":
 
     basepath = "/home/cb51neqa/projects/itp/exp_data/2021-12-20/5µA"
@@ -156,37 +191,9 @@ if __name__ == "__main__":
     channel = [27, 27]
     lagstep = 30
 
-    titles, detected = [], []
+    cores = mp.cpu_count()
+    threads = int(cores/4) # 4 cores are required for each sampling
 
-    results = np.empty((len(innames), 2))
-
-    for inname in innames:
-        j = 0
-        while True:
-            try:
-                print(inname)
-                idata_cross, min_, max_ = main(inname, channel, lagstep, px, fps)
-            except:
-                if j<3:
-                    print("retry")
-                    j+=1
-                    continue
-                else:
-                    break
-
-            number = (inname.split("_")[-1]).split("/")[-1]
-            number = number.replace(".nd2", "")
-            folder = (inname.split("/")[-2])
-
-            folder = folder + "/" + number
-
-            from pathlib import Path
-            Path(folder).mkdir(parents=True, exist_ok=True)
-
-            idata_cross.to_netcdf(folder+"/idata_cross.nc")
-            with open(folder+"/intervals.dat", 'w') as f:
-                f.write("{}\t{}".format(min_, max_))
-            
-            print(folder+"/idata_cross.nc")
-
-            break
+    with mp.Pool(threads) as pool:
+        multiple_results = [pool.apply_async(run, (inname, channel, lagstep, px, fps)) for inname in innames]
+        print([res.get() for res in multiple_results])
