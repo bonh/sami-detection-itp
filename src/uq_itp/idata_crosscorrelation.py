@@ -78,7 +78,7 @@ def main(inname, channel, lagstep, px, fps, data_raw=None, startframe=None, delt
 
         with bayesian.signalmodel_correlation(corr_mean_smoothed, -x_lag_smoothed, px, lagstep, fps, artificial=artificial) as model:
             try:
-                trace = pm.sample(8000, tune=4000, return_inferencedata=False, cores=4, target_accept=0.9, callback=MyCallback(model,every=1000))
+                trace = pm.sample(8000, tune=4000, return_inferencedata=False, cores=1, chains=4, target_accept=0.9, callback=MyCallback(model,every=1000))
             except RuntimeError:
                 return -1e5
 
@@ -128,7 +128,7 @@ def main(inname, channel, lagstep, px, fps, data_raw=None, startframe=None, delt
     x_lag_smoothed = x_lag[int(window/2):-int(window/2)]
 
     with bayesian.signalmodel_correlation(corr_mean_smoothed, -x_lag_smoothed, px, lagstep, fps, artificial=artificial) as model:
-        trace = pm.sample(8000, tune=4000, return_inferencedata=False, cores=4, target_accept=0.9)
+        trace = pm.sample(8000, tune=4000, return_inferencedata=False, cores=1, chains=4, target_accept=0.9)
      
         ppc = pm.fast_sample_posterior_predictive(trace, model=model)
         prior_pc = pm.sample_prior_predictive(50000, model=model)
@@ -144,7 +144,8 @@ def run(inname, channel, lagstep, px, fps):
         try:
             print(inname)
             idata_cross, min_, max_ = main(inname, channel, lagstep, px, fps)
-        except:
+        except Exception as e:
+            print(e)
             if j<3:
                 print("retry")
                 j+=1
@@ -194,7 +195,7 @@ if __name__ == "__main__":
     lagstep = 30
 
     cores = mp.cpu_count()
-    threads = int(cores/4) # 4 cores are required for each sampling
+    threads = int(cores)
 
     with mp.Pool(threads) as pool:
         multiple_results = [pool.apply_async(run, (inname, channel, lagstep, px, fps)) for inname in innames]
