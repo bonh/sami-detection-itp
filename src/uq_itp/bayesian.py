@@ -73,9 +73,9 @@ def signalmodel(data, x, artificial=False):
     with pm.Model() as model:
         # background
         # f = c
-        c = pm.Normal('c', 0, 1)
+        c = pm.Normal('c', 0, 0.1)
         if not artificial:
-            b = pm.Normal('b', 0, 1)
+            b = pm.Normal('b', 0, 0.1)
             #d = pm.Normal('d', 0, 1)
             #background = pm.Deterministic("background", d*x**2+b*x+c)
             background = pm.Deterministic("background", b*x+c)
@@ -83,12 +83,12 @@ def signalmodel(data, x, artificial=False):
             background = pm.Deterministic("background", c)
 
         # sample peak
-        amp = pm.HalfNormal('amplitude', 5)
+        amp = pm.HalfNormal('amplitude', 10)
         measure = pm.Uniform("measure", 0, 1)
         cent = pm.Deterministic('centroid', measure*len(data))
         sig = pm.HalfNormal('sigma', 20) # TODO: calculate from physics?
         #sig = pm.Deterministic("sigma", pm.Beta('beta', 2, 2)*20)# TODO: calculate from physics?
-        alpha = pm.Normal("alpha", 0, 1)
+        alpha = pm.Normal("alpha", 0, 0.1)
         
         sample = pm.Deterministic("sample", model_sample(amp, cent, sig, alpha, x))
         
