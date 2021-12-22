@@ -26,9 +26,16 @@ class MyCallback:
     def __call__(self, trace, draw):
         if draw.tuning:
             return
+
         self.count += int(draw.stats[0]['diverging'])
         if self.count > 10:
             raise RuntimeError
+
+        self.traces[draw.chain] = trace
+        if len(trace) % self.every == 0:
+            multitrace = pm.backends.base.MultiTrace(list(self.traces.values()))
+            if pm.stats.rhat(multitrace).to_array().max() < self.max_rhat:
+                raise KeyboardInterrupt
 
 def main(inname, channel, lagstep, px, fps, data_raw=None, startframe=None, delta=None, artificial=False):
     if inname and channel:
@@ -57,7 +64,7 @@ def main(inname, channel, lagstep, px, fps, data_raw=None, startframe=None, delt
 
     def functional(parameters):
         startframe = parameters["start"]
-        #delta = parameters["delta"]
+        delta = parameters["delta"]
 
         print(startframe, delta)
 
@@ -78,9 +85,12 @@ def main(inname, channel, lagstep, px, fps, data_raw=None, startframe=None, delt
 
         with bayesian.signalmodel_correlation(corr_mean_smoothed, -x_lag_smoothed, px, lagstep, fps, artificial=artificial) as model:
             try:
-                trace = pm.sample(8000, tune=4000, return_inferencedata=False, cores=1, chains=4, target_accept=0.9, callback=MyCallback(model,every=1000))
+                trace = pm.sample(10000, tune=4000, return_inferencedata=False, cores=1, chains=4, target_accept=0.9, callback=MyCallback(model))
             except RuntimeError:
+                print("Divergence!")
                 return -1e5
+            except KeyboardInterrupt:
+                print("Converged!")
 
         idata = az.from_pymc3(trace=trace, model=model) 
         
@@ -95,19 +105,19 @@ def main(inname, channel, lagstep, px, fps, data_raw=None, startframe=None, delt
         return result
 
     if not startframe and not delta:  
-        delta = 200
+        #delta = 200
             
-        #search_space = {"start": np.arange(0, 200, 10), "delta": np.arange(0, 200, 10)}
-        search_space = {"start": np.arange(100, 300, 10)}
+        search_space = {"start": np.arange(0, 300, 10), "delta": np.arange(0, 300, 10)}
+        #search_space = {"start": np.arange(100, 300, 10)}
 
         #opt = RandomSearchOptimizer(search_space)
         opt = BayesianOptimizer(search_space)
         #opt = EvolutionStrategyOptimizer(search_space)
         #opt = SimulatedAnnealingOptimizer(search_space)
-        opt.search(functional, n_iter=20, early_stopping={"n_iter_no_change":5}, max_score=-4)
+        opt.search(functional, n_iter=20, early_stopping={"n_iter_no_change":5})
 
         startframe = opt.best_para["start"]
-        #endframe = startframe + opt.best_para["delta"]
+        endframe = startframe + opt.best_para["delta"]
         
     endframe = startframe + delta
     print(startframe, endframe)
@@ -128,8 +138,8 @@ def main(inname, channel, lagstep, px, fps, data_raw=None, startframe=None, delt
     x_lag_smoothed = x_lag[int(window/2):-int(window/2)]
 
     with bayesian.signalmodel_correlation(corr_mean_smoothed, -x_lag_smoothed, px, lagstep, fps, artificial=artificial) as model:
-        trace = pm.sample(8000, tune=4000, return_inferencedata=False, cores=1, chains=4, target_accept=0.9)
-     
+        trace = pm.sample(10000, tune=4000, return_inferencedata=False, cores=1, chains=4, target_accept=0.9, callback=MyCallback(model))
+
         ppc = pm.fast_sample_posterior_predictive(trace, model=model)
         prior_pc = pm.sample_prior_predictive(50000, model=model)
         idata = az.from_pymc3(trace=trace, posterior_predictive=ppc, model=model, prior=prior_pc) 
