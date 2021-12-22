@@ -1,5 +1,6 @@
 import os
 import sys
+from os.path import expanduser
 import multiprocessing as mp
 from pprint import pprint
 import numpy as np
@@ -170,7 +171,8 @@ def run(inname, channel, lagstep, px, fps):
 
 if __name__ == "__main__":
 
-    basepath = "/home/cb51neqa/projects/itp/exp_data/2021-12-20/5µA"
+    home = expanduser("~")
+    basepath = home + "/projects/itp/exp_data/2021-12-20/5µA"
 
     innames = []
     for root, dirs, files in os.walk(basepath):
