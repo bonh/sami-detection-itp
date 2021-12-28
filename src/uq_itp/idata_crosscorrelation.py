@@ -47,17 +47,8 @@ def main(inname, channel, lagstep, px, fps, data_raw=None, startframe=None, delt
         data = data_raw
     data = dataprep.standardize(data)
 
-    fft2 = np.fft.fft2(data)
-    
-    mask = np.zeros(data.shape)
-    for y, x in np.ndindex(mask.shape):
-        if x>0 and x < 30 and y > 490:
-            mask[y, x] = 1
-    
-    tmp = np.fft.ifft2(fft2*mask)
-    tmp = np.abs(tmp)
-    tmp = dataprep.standardize(tmp)
-    data = tmp
+    data = dataprep.fourierfilter(data, 40)
+    data = dataprep.standardize(data)
 
     corr = dataprep.correlate_frames(data, lagstep)
     corr = dataprep.standardize(corr)

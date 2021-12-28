@@ -1,5 +1,6 @@
 import numpy as np
 from nd2reader import ND2Reader
+import scipy as sc
 
 def load_nd_data(inname, startframe=0, endframe=-1, verbose=False, nth=1):
     '''
@@ -106,3 +107,25 @@ def simplemovingmean(data, window, beta=0):
     window_ = np.kaiser(window, beta)
     window_ = window_ / window_.sum()
     return np.convolve(window_, data, mode='valid')
+
+def fourierfilter(data, r):
+    ff = np.fft.fft2(data)
+    ff = np.fft.fftshift(ff)
+       
+    X, Y = ff.shape
+        
+    window_y = sc.signal.windows.gaussian(Y, std=r/8)[:,None]
+    window_x = sc.signal.windows.gaussian(X, std=r)[:,None]
+    window2d = np.sqrt(np.dot(window_x, window_y.T)) # expand to 2D
+    window2d = sc.ndimage.interpolation.rotate(window2d, angle=-45, reshape=False)
+    
+    # remove strong horizontal and vertical frequency components
+    window2d[int(X/2),:] = 0
+    window2d[:,int(Y/2)] = 0
+    
+    ff = window2d * ff
+    
+    iff = np.fft.ifftshift(ff)
+    iff = np.fft.ifft2(iff)
+    
+    return np.real(iff)
