@@ -137,14 +137,14 @@ def main(inname, channel, lagstep, px, fps, data_raw=None, startframe=None, delt
 
     return idata, startframe, endframe 
 
-def run(inname, channel, lagstep, px, fps):
+def run(inname, channel, lagstep, px, fps, cores=1):
     sys.stdout = open(str(os.getpid()) + ".out", "w")
     sys.stderr = open(str(os.getpid()) + ".err", "w")
     j = 0
     while True:
         try:
             print(inname)
-            idata_cross, min_, max_ = main(inname, channel, lagstep, px, fps)
+            idata_cross, min_, max_ = main(inname, channel, lagstep, px, fps, cores=cores)
         except Exception as e:
             print(e)
             if j<3:
@@ -195,9 +195,12 @@ if __name__ == "__main__":
     channel = [27, 27]
     lagstep = 30
 
-    cores = mp.cpu_count()
-    threads = int(cores)
+    for iname in innames:
+        run(inname, channel, lagstep, px, fps, cores=4)
 
-    with mp.Pool(threads) as pool:
-        multiple_results = [pool.apply_async(run, (inname, channel, lagstep, px, fps)) for inname in innames]
-        print([res.get() for res in multiple_results])
+    #cores = mp.cpu_count()
+    #threads = int(cores)
+
+    #with mp.Pool(threads) as pool:
+    #    multiple_results = [pool.apply_async(run, (inname, channel, lagstep, px, fps)) for inname in innames]
+    #    print([res.get() for res in multiple_results])
