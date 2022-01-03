@@ -101,7 +101,7 @@ def main(inname, channel, lagstep, px, fps, data_raw=None, startframe=None, delt
 
         with bayesian.signalmodel_correlation(corr_mean_smoothed_combined.T, -np.array([x_lag_smoothed,]*N).T, px, deltalagstep, fps, artificial=artificial) as model:
             try:
-                trace = pm.sample(2000, return_inferencedata=False, cores=cores, chains=4, target_accept=0.9, callback=MyCallback(model))
+                trace = pm.sample(samples, tune=tune, return_inferencedata=False, cores=cores, chains=4, target_accept=0.9, callback=MyCallback(model))
             except RuntimeError:
                 print("Divergence!")
                 return -1e5
@@ -113,7 +113,7 @@ def main(inname, channel, lagstep, px, fps, data_raw=None, startframe=None, delt
         hdi_velocity = az.hdi(idata, var_names="velocity").velocity.values[0]
         s = hdi_velocity[1] - hdi_velocity[0]
         result = -1/2*np.sqrt(s**2)# + 1e-4*delta
-        result = result.item()
+        result = result
 
         v = bayesian.get_mode(idata.posterior, ["velocity"])[0]*1e-6
         print(v*1e6)
@@ -130,7 +130,7 @@ def main(inname, channel, lagstep, px, fps, data_raw=None, startframe=None, delt
         opt = BayesianOptimizer(search_space)
         #opt = EvolutionStrategyOptimizer(search_space)
         #opt = SimulatedAnnealingOptimizer(search_space)
-        opt.search(functional, n_iter=20, early_stopping={"n_iter_no_change":5})
+        opt.search(functional, n_iter=1, early_stopping={"n_iter_no_change":5})
 
         startframe = opt.best_para["start"]
         endframe = startframe + opt.best_para["delta"]
@@ -138,22 +138,19 @@ def main(inname, channel, lagstep, px, fps, data_raw=None, startframe=None, delt
         endframe = startframe + delta
     print(startframe, endframe)
 
-    corr_mean = np.mean(corr[:,startframe:endframe], axis=1)
-        
-    x_lag = np.linspace(-corr_mean.shape[0]/2, corr_mean.shape[0]/2, corr_mean.shape[0])
+    corr_mean_smoothed_combined = np.zeros((N, 250))
 
-    corr_mean[int(corr_mean.shape[0]/2)] = 0
-    corr_mean = corr_mean[0:int(corr_mean.shape[0]/2)]
+    for i in range(0, N):
+        corr = corr_combined[i]
+        lagstep = lagstepstart + (1+i)*deltalagstep
 
-    x_lag = x_lag[0:int(corr_mean.shape[0])]
+        start = startframe
+        end = endframe - lagstep
 
-    corr_mean = dataprep.standardize(corr_mean)
+        x_lag_smoothed, corr_mean_smoothed = get_corr(corr, start, end)
+        corr_mean_smoothed_combined[i,:] = corr_mean_smoothed
 
-    window = 7
-    corr_mean_smoothed = dataprep.simplemovingmean(corr_mean, window, beta=6)
-    x_lag_smoothed = x_lag[int(window/2):-int(window/2)]
-
-    with bayesian.signalmodel_correlation(corr_mean_smoothed, -x_lag_smoothed, px, lagstep, fps, artificial=artificial) as model:
+    with bayesian.signalmodel_correlation(corr_mean_smoothed_combined.T, -np.array([x_lag_smoothed,]*N).T, px, deltalagstep, fps, artificial=artificial) as model:
         trace = pm.sample(samples, tune=tune, return_inferencedata=False, cores=cores, chains=4, target_accept=0.9, callback=MyCallback(model))
 
         ppc = pm.fast_sample_posterior_predictive(trace, model=model)
@@ -165,17 +162,17 @@ def main(inname, channel, lagstep, px, fps, data_raw=None, startframe=None, delt
 def run(inname, channel, lagstep, px, fps, cores=1):
     j = 0
     while True:
-       # try:
-        print(inname)
-        idata_cross, min_, max_ = main(inname, channel, lagstep, px, fps, cores=cores)
-       # except Exception as e:
-       #     print(e)
-       #     if j<3:
-       #         print("retry")
-       #         j+=1
-       #         continue
-       #     else:
-       #         break
+        try:
+            print(inname)
+            idata_cross, min_, max_ = main(inname, channel, lagstep, px, fps, cores=cores)
+        except Exception as e:
+            print(e)
+            if j<3:
+                print("retry")
+                j+=1
+                continue
+            else:
+                break
 
         number = (inname.split("_")[-1]).split("/")[-1]
         number = number.replace(".nd2", "")
@@ -206,7 +203,7 @@ if __name__ == "__main__":
                 if(f.endswith(".nd2")):
                     innames.append(os.path.join(root,f))
 
-    innames = list(filter(lambda inname: "10pg_l" in inname, innames))
+    innames = list(filter(lambda inname: "_1pg_l" in inname, innames))
     #innames = innames[20:]
     #innames = innames[-5:-1]
     pprint(innames)
