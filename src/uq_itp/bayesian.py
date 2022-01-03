@@ -27,42 +27,46 @@ def get_mode(data, var_names):
     _, vals = az.sel_utils.xarray_to_ndarray(data, var_names=var_names)
     return [az.plots.plot_utils.calculate_point_estimate("mode", val) for val in vals]
 
-def signalmodel_correlation(data, x, px, lagstep, fps, artificial=False):
+def signalmodel_correlation(data, x, px, deltalagstep, fps, artificial=False):
+    
+    N = x.shape[1]
+    
     with pm.Model() as model:
         # background
         # f = b*x + c
         #aa = pm.Normal("a", 0, 0.0001)
-        c = pm.Normal('c', 0, 1)
+        c = pm.Normal('c', 0, 1, shape=1)
         if not artificial:
-            b = pm.Normal('b', 0, 1)
+            b = pm.Normal('b', 0, 1, shape=1)
             background = pm.Deterministic("background", b*x+c)
         else:
             background = pm.Deterministic("background", c)
 
         # sample peak
-        amp = pm.HalfNormal('amplitude', 20)
-        measure = pm.Uniform("measure", 0, 1)
+        amp = pm.HalfNormal('amplitude', 20, shape=1)
+        measure = pm.Uniform("measure", 0, 1, shape=1)
         cent = pm.Deterministic('centroid', measure*len(data))
-        sig = pm.HalfNormal('sigma', 50) # TODO: calculate from physics?
+        deltacent = pm.HalfNormal("deltac", 10, shape=1)
+        sig = pm.HalfNormal('sigma', 50, shape=1) # TODO: calculate from physics?
         #alpha = pm.Normal("alpha", 0, 0.1)
-
-        def sample(amp, cent, sig, x):        
-            return amp*tt.exp(-(cent - x)**2/2/sig**2)
         
-        sample = pm.Deterministic("sample", sample(amp, cent, sig, x))
+        def sample(amp, cent, deltacent, sig, x):
+            n = range(0,N)
+            return amp*tt.exp(-(cent + deltacent*n - x)**2/2/sig**2)
+        
+        sample = pm.Deterministic("sample", sample(amp, cent, deltacent, sig, x))
         
         # background + sample
         signal = pm.Deterministic('signal', background + sample)
 
         # prior noise
-        sigma_noise = pm.HalfNormal('sigma_noise', 1) # TODO: can we estimate a prior value from zero concentration images?
+        sigma_noise = pm.HalfNormal('sigma_noise', 1, shape=1) # TODO: can we estimate a prior value from zero concentration images?
 
         # likelihood       
         likelihood = pm.Normal('y', mu = signal, sd=sigma_noise, observed = data)
         
         # derived quantities
-        velocity = pm.Deterministic("velocity", cent*px/(lagstep/fps)*1e6)
-        snr = pm.Deterministic("snr", amp/sigma_noise)
+        velocity = pm.Deterministic("velocity", deltacent*px/(deltalagstep/fps)*1e6)
 
         return model
     
