@@ -50,33 +50,58 @@ def main(inname, channel, lagstep, px, fps, data_raw=None, startframe=None, delt
     data = dataprep.fourierfilter(data, 40)
     data = dataprep.standardize(data)
 
-    corr = dataprep.correlate_frames(data, lagstep)
-    corr = dataprep.standardize(corr)
+    lagstepstart = 30
+    deltalagstep = 10
+    N = 10
+
+    corr_combined = []
+    for i in range(0, N):
+        corr = dataprep.correlate_frames(data, lagstepstart + (1+i)*deltalagstep)
+
+        corr_combined.append(dataprep.standardize(corr))
+
+    def get_corr(corr, start, end):
+        corr_mean = np.mean(corr[:,start:end], axis=1)
+        x_lag = np.linspace(-corr_mean.shape[0]/2, corr_mean.shape[0]/2, corr_mean.shape[0])
+        
+        # clean the correlation data
+        # remove peak at zero lag
+        corr_mean[int(corr_mean.shape[0]/2)] = 0
+        #cut everything right of the middle (because we know that the velocity is positiv)
+        corr_mean = corr_mean[0:int(corr_mean.shape[0]/2)]
+        
+        x_lag = x_lag[0:int(corr_mean.shape[0])]
+        
+        corr_mean = dataprep.standardize(corr_mean)
+        
+        window = 7
+        corr_mean_smoothed = dataprep.simplemovingmean(corr_mean, window, beta=6)
+        x_lag_smoothed = x_lag[int(window/2):-int(window/2)]
+        
+        return x_lag_smoothed, corr_mean_smoothed
 
     def functional(parameters):
         startframe = parameters["start"]
         delta = parameters["delta"]
+        endframe = startframe + delta
 
         print(startframe, delta)
 
-        corr_mean = np.mean(corr[:,startframe:startframe+delta], axis=1)
-        
-        x_lag = np.linspace(-corr_mean.shape[0]/2, corr_mean.shape[0]/2, corr_mean.shape[0])
+        corr_mean_smoothed_combined = np.zeros((N, 250))
 
-        corr_mean[int(corr_mean.shape[0]/2)] = 0
-        corr_mean = corr_mean[0:int(corr_mean.shape[0]/2)]
+        for i in range(0, N):
+            corr = corr_combined[i]
+            lagstep = lagstepstart + (1+i)*deltalagstep
 
-        x_lag = x_lag[0:int(corr_mean.shape[0])]
+            start = startframe
+            end = endframe - lagstep
 
-        corr_mean = dataprep.standardize(corr_mean)
+            x_lag_smoothed, corr_mean_smoothed = get_corr(corr, start, end)
+            corr_mean_smoothed_combined[i,:] = corr_mean_smoothed
 
-        window = 7
-        corr_mean_smoothed = dataprep.simplemovingmean(corr_mean, window, beta=6)
-        x_lag_smoothed = x_lag[int(window/2):-int(window/2)]
-
-        with bayesian.signalmodel_correlation(corr_mean_smoothed, -x_lag_smoothed, px, lagstep, fps, artificial=artificial) as model:
+        with bayesian.signalmodel_correlation(corr_mean_smoothed_combined.T, -np.array([x_lag_smoothed,]*N).T, px, deltalagstep, fps, artificial=artificial) as model:
             try:
-                trace = pm.sample(5000, tune=2000, return_inferencedata=False, cores=1, chains=4, target_accept=0.9, callback=MyCallback(model))
+                trace = pm.sample(2000, return_inferencedata=False, cores=cores, chains=4, target_accept=0.9, callback=MyCallback(model))
             except RuntimeError:
                 print("Divergence!")
                 return -1e5
@@ -85,7 +110,7 @@ def main(inname, channel, lagstep, px, fps, data_raw=None, startframe=None, delt
 
         idata = az.from_pymc3(trace=trace, model=model) 
         
-        hdi_velocity = az.hdi(idata, var_names=["velocity"])["velocity"]
+        hdi_velocity = az.hdi(idata, var_names="velocity").velocity.values[0]
         s = hdi_velocity[1] - hdi_velocity[0]
         result = -1/2*np.sqrt(s**2)# + 1e-4*delta
         result = result.item()
@@ -138,21 +163,19 @@ def main(inname, channel, lagstep, px, fps, data_raw=None, startframe=None, delt
     return idata, startframe, endframe 
 
 def run(inname, channel, lagstep, px, fps, cores=1):
-    sys.stdout = open(str(os.getpid()) + ".out", "w")
-    sys.stderr = open(str(os.getpid()) + ".err", "w")
     j = 0
     while True:
-        try:
-            print(inname)
-            idata_cross, min_, max_ = main(inname, channel, lagstep, px, fps, cores=cores)
-        except Exception as e:
-            print(e)
-            if j<3:
-                print("retry")
-                j+=1
-                continue
-            else:
-                break
+       # try:
+        print(inname)
+        idata_cross, min_, max_ = main(inname, channel, lagstep, px, fps, cores=cores)
+       # except Exception as e:
+       #     print(e)
+       #     if j<3:
+       #         print("retry")
+       #         j+=1
+       #         continue
+       #     else:
+       #         break
 
         number = (inname.split("_")[-1]).split("/")[-1]
         number = number.replace(".nd2", "")
@@ -183,7 +206,7 @@ if __name__ == "__main__":
                 if(f.endswith(".nd2")):
                     innames.append(os.path.join(root,f))
 
-    #innames = list(filter(lambda inname: "10pg_l" in inname or "1pg_l" in inname, innames))
+    innames = list(filter(lambda inname: "10pg_l" in inname, innames))
     #innames = innames[20:]
     #innames = innames[-5:-1]
     pprint(innames)
@@ -195,7 +218,7 @@ if __name__ == "__main__":
     channel = [27, 27]
     lagstep = 30
 
-    for iname in innames:
+    for inname in innames:
         run(inname, channel, lagstep, px, fps, cores=4)
 
     #cores = mp.cpu_count()
