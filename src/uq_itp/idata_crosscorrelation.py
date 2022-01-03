@@ -31,13 +31,13 @@ class MyCallback:
         if self.count > 10:
             raise RuntimeError
 
-        self.traces[draw.chain] = trace
-        if len(trace) % self.every == 0:
-            multitrace = pm.backends.base.MultiTrace(list(self.traces.values()))
-            if pm.stats.rhat(multitrace).to_array().max() < self.max_rhat:
-                raise KeyboardInterrupt
+#        self.traces[draw.chain] = trace
+#        if len(trace) % self.every == 0:
+#            multitrace = pm.backends.base.MultiTrace(list(self.traces.values()))
+#            if pm.stats.rhat(multitrace).to_array().max() < self.max_rhat:
+#                raise KeyboardInterrupt
 
-def main(inname, channel, lagstep, px, fps, data_raw=None, startframe=None, delta=None, artificial=False):
+def main(inname, channel, lagstep, px, fps, data_raw=None, startframe=None, delta=None, artificial=False, cores=1, samples=5000, tune=2000):
     if inname and channel:
         data_raw = helper.raw2images(inname, channel)
 
@@ -76,7 +76,7 @@ def main(inname, channel, lagstep, px, fps, data_raw=None, startframe=None, delt
 
         with bayesian.signalmodel_correlation(corr_mean_smoothed, -x_lag_smoothed, px, lagstep, fps, artificial=artificial) as model:
             try:
-                trace = pm.sample(10000, tune=4000, return_inferencedata=False, cores=1, chains=4, target_accept=0.9, callback=MyCallback(model))
+                trace = pm.sample(5000, tune=2000, return_inferencedata=False, cores=1, chains=4, target_accept=0.9, callback=MyCallback(model))
             except RuntimeError:
                 print("Divergence!")
                 return -1e5
@@ -98,7 +98,7 @@ def main(inname, channel, lagstep, px, fps, data_raw=None, startframe=None, delt
     if not startframe and not delta:  
         #delta = 200
             
-        search_space = {"start": np.arange(0, 300, 10), "delta": np.arange(0, 300, 10)}
+        search_space = {"start": np.arange(0, 300, 10), "delta": np.arange(150, 300, 10)}
         #search_space = {"start": np.arange(100, 300, 10)}
 
         #opt = RandomSearchOptimizer(search_space)
@@ -109,8 +109,8 @@ def main(inname, channel, lagstep, px, fps, data_raw=None, startframe=None, delt
 
         startframe = opt.best_para["start"]
         endframe = startframe + opt.best_para["delta"]
-        
-    endframe = startframe + delta
+    else:
+        endframe = startframe + delta
     print(startframe, endframe)
 
     corr_mean = np.mean(corr[:,startframe:endframe], axis=1)
@@ -129,7 +129,7 @@ def main(inname, channel, lagstep, px, fps, data_raw=None, startframe=None, delt
     x_lag_smoothed = x_lag[int(window/2):-int(window/2)]
 
     with bayesian.signalmodel_correlation(corr_mean_smoothed, -x_lag_smoothed, px, lagstep, fps, artificial=artificial) as model:
-        trace = pm.sample(10000, tune=4000, return_inferencedata=False, cores=1, chains=4, target_accept=0.9, callback=MyCallback(model))
+        trace = pm.sample(samples, tune=tune, return_inferencedata=False, cores=cores, chains=4, target_accept=0.9, callback=MyCallback(model))
 
         ppc = pm.fast_sample_posterior_predictive(trace, model=model)
         prior_pc = pm.sample_prior_predictive(50000, model=model)
@@ -186,7 +186,7 @@ if __name__ == "__main__":
     #innames = list(filter(lambda inname: "10pg_l" in inname or "1pg_l" in inname, innames))
     #innames = innames[20:]
     #innames = innames[-5:-1]
-    #pprint(innames)
+    pprint(innames)
 
     # same for every experiment
     fps = 46 # frames per second (1/s)

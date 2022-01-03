@@ -37,7 +37,7 @@ def main(inname, channel, px, fps, rope_velocity, idata_cross, startframe, endfr
 
     x = np.linspace(0, len(data_mean), len(data_mean))
     with bayesian.signalmodel(data_mean, x, artificial=artificial) as model:
-        trace = pm.sample(8000, tune=4000, return_inferencedata=False, chains=4, cores=1, target_accept=0.9)
+        trace = pm.sample(16000, tune=8000, return_inferencedata=False, chains=4, cores=1, target_accept=0.9)
     
         ppc = pm.fast_sample_posterior_predictive(trace, model=model)
         idata = az.from_pymc3(trace=trace, posterior_predictive=ppc, model=model) 
