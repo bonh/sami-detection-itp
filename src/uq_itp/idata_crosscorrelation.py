@@ -123,14 +123,14 @@ def main(inname, channel, lagstep, px, fps, data_raw=None, startframe=None, delt
     if not startframe and not delta:  
         #delta = 200
             
-        search_space = {"start": np.arange(0, 300, 10), "delta": np.arange(150, 300, 10)}
+        search_space = {"start": np.arange(100, 300, 10), "delta": np.arange(150, 250, 10)}
         #search_space = {"start": np.arange(100, 300, 10)}
 
         #opt = RandomSearchOptimizer(search_space)
         opt = BayesianOptimizer(search_space)
         #opt = EvolutionStrategyOptimizer(search_space)
         #opt = SimulatedAnnealingOptimizer(search_space)
-        opt.search(functional, n_iter=1, early_stopping={"n_iter_no_change":5})
+        opt.search(functional, n_iter=20, early_stopping={"n_iter_no_change":5})
 
         startframe = opt.best_para["start"]
         endframe = startframe + opt.best_para["delta"]
