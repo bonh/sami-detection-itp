@@ -23,15 +23,13 @@ import bayesian
 import re
 
 # +
-concentrations = ["AF647_10ng_l", "AF647_1ng_l", "AF647_100pg_l", "AF647_10pg_l", "AF647_1pg_l"]
+concentrations = ["AF647_10ng_l", "AF647_1ng_l", "AF647_100pg_l", "AF647_10pg_l", "AF647_1pg_l", "AF647_0ng_l"]
 
-rope_velocity = [200, 250]
+N = 6
 
-N = 5
+rope_velocity = (120, 180)
 
 # +
-rope = {'velocity': [{'rope': rope_velocity}]}
-
 hdis = np.zeros((len(concentrations)*N, 6))
 print(hdis.shape)
 fig, axs = plt.subplots(len(concentrations), N, figsize=(20,8))
@@ -47,26 +45,34 @@ for j in range(0, len(concentrations)):
             
             inname = "./{}/00{}/idata_cross.nc".format(concentrations[j], i+1)
             idata = az.InferenceData.from_netcdf(inname) 
-            
-            ax = az.plot_posterior(
-                idata, var_names=["velocity"], 
-                kind="hist", point_estimate='mode', hdi_prob=.95, ax=axs[j,i], textsize=8);
-            #ax = az.plot_posterior(
-            #    idata, var_names=["velocity"], group="prior", kind="hist", ax=axs[j,i], textsize=8, point_estimate=None, hdi_prob="hide");
-            #ax.set_xlim(100, 200)
+
+            hdi = az.hdi(idata, hdi_prob=.95, var_names="velocity").velocity.values[0]
+
+            if hdi[1] > 200 or hdi[0] < 100:
+                ax = az.plot_posterior(
+                    idata, var_names=["velocity"], 
+                    kind="hist", hdi_prob="hide", point_estimate=None, ax=axs[j,i], textsize=8, rope=rope_velocity);
+                axs[j,i].text(0.5, 0.9, 'probably no sample present\n or sampling failed', horizontalalignment='center', verticalalignment='center', fontsize=8, transform=ax.transAxes)
+            else: 
+                ax = az.plot_posterior(
+                    idata, var_names=["velocity"], 
+                    kind="hist", point_estimate='mode', hdi_prob=.95, ax=axs[j,i], textsize=8, rope=rope_velocity);
+                #ax = az.plot_posterior(
+                #    idata, var_names=["velocity"], group="prior", kind="hist", ax=axs[j,i], textsize=8, point_estimate=None, hdi_prob="hide");
+                ax.set_xlim(100, 200)
             ax.set_title("")
-            
-            hdi = az.hdi(idata, hdi_prob=.95, var_names="velocity")
             
             with open("./{}/00{}/intervals.dat".format(concentrations[j], i+1)) as f:
                 min_, max_ = [int(x) for x in next(f).split()]
             nframes = max_-min_
             
             mode = bayesian.get_mode(idata.posterior, ["velocity"])[0]
-            hdis[j*N+i,:] = np.array([conc, i+1, hdi.velocity.values[0], hdi.velocity.values[1], mode, nframes])
+            hdis[j*N+i,:] = np.array([conc, i+1, hdi[0], hdi[1], mode, nframes])
         
         except FileNotFoundError as e:
-            print(e)        
+            axs[j,i].axis("off")
+            axs[j,i].text(0.5, 0.5, 'experiment not found', horizontalalignment='center', verticalalignment='center', fontsize=8)
+            continue
                 
         if j == 0:
             axs[j,i].set_title("experiment {}".format(i+1))
@@ -74,16 +80,15 @@ for j in range(0, len(concentrations)):
         if i == 0:
             axs[j,i].set_ylabel("{} ng/l".format(conc))
 
+fig.tight_layout()
 fig.savefig("velocities.png")
 np.savetxt("velocities.csv", hdis, header="c, n, low, high, mean, nframes", delimiter=",", comments='', fmt='%5g, %1.1g, %1.1f, %1.1f, %1.1f, %1.1g')
 # -
 
-np.isnan(data)
+#hdis[np.where(hdis[:,4]>400),4] = np.nan
 
-hdis[np.where(hdis[:,4]>400),4] = np.nan
-
-means = np.nanmean(hdis[:,4].reshape(3,-1,5), axis=2).reshape(3,)
-stds = np.nanstd(hdis[:,4].reshape(3,-1,5), axis=2).reshape(3,)
+means = np.nanmean(hdis[:,4].reshape(3,-1,N), axis=2).reshape(3,)
+stds = np.nanstd(hdis[:,4].reshape(3,-1,N), axis=2).reshape(3,)
 
 plt.scatter(hdis[:,0], hdis[:,4], label="mode")
 plt.errorbar(concentrations, means, yerr=stds.T, fmt="ro", label="mean+std", alpha=0.8)
@@ -92,3 +97,5 @@ plt.xlabel("concentration")
 plt.ylabel("velocity")
 #plt.ylim(200, 300);
 plt.legend();
+plt.tight_layout()
+plt.savefig("velocities_summary.png")
