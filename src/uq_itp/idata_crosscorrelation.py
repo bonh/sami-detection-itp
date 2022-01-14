@@ -37,7 +37,7 @@ class MyCallback:
 #            if pm.stats.rhat(multitrace).to_array().max() < self.max_rhat:
 #                raise KeyboardInterrupt
 
-def main(inname, channel, lagstep, px, fps, data_raw=None, startframe=None, delta=None, artificial=False, cores=1, samples=5000, tune=2000):
+def main(inname, channel, lagstep, px, fps, data_raw=None, startframe=None, delta=None, artificial=False, cores=1, samples=5000, tune=5000):
     if inname and channel:
         data_raw = helper.raw2images(inname, channel)
 
@@ -45,41 +45,16 @@ def main(inname, channel, lagstep, px, fps, data_raw=None, startframe=None, delt
         data = dataprep.averageoverheight(data_raw)
     else:
         data = data_raw
-    data = dataprep.standardize(data)
+    data = dataprep.standardize(data, axis=0)
 
-    data = dataprep.fourierfilter(data, 40)
-    data = dataprep.standardize(data)
+    data, _, _ = dataprep.fourierfilter(data, 40, 40/8, -45, True, True)
+    data = dataprep.standardize(data, axis=0)
 
-    lagstepstart = 30
-    deltalagstep = 10
-    N = 10
-
-    corr_combined = []
-    for i in range(0, N):
-        corr = dataprep.correlate_frames(data, lagstepstart + (1+i)*deltalagstep)
-
-        corr_combined.append(dataprep.standardize(corr))
-
-    def get_corr(corr, start, end):
-        corr_mean = np.mean(corr[:,start:end], axis=1)
-        x_lag = np.linspace(-corr_mean.shape[0]/2, corr_mean.shape[0]/2, corr_mean.shape[0])
-        
-        # clean the correlation data
-        # remove peak at zero lag
-        corr_mean[int(corr_mean.shape[0]/2)] = 0
-        #cut everything right of the middle (because we know that the velocity is positiv)
-        corr_mean = corr_mean[0:int(corr_mean.shape[0]/2)]
-        
-        x_lag = x_lag[0:int(corr_mean.shape[0])]
-        
-        corr_mean = dataprep.standardize(corr_mean)
-        
-        window = 7
-        corr_mean_smoothed = dataprep.simplemovingmean(corr_mean, window, beta=6)
-        x_lag_smoothed = x_lag[int(window/2):-int(window/2)]
-        
-        return x_lag_smoothed, corr_mean_smoothed
-
+    global best_trace
+    global best_model
+    best_trace = None
+    best_model = None
+    
     def functional(parameters):
         startframe = parameters["start"]
         delta = parameters["delta"]
@@ -87,92 +62,96 @@ def main(inname, channel, lagstep, px, fps, data_raw=None, startframe=None, delt
 
         print(startframe, delta)
 
-        corr_mean_smoothed_combined = np.zeros((N, 250))
-
-        for i in range(0, N):
-            corr = corr_combined[i]
-            lagstep = lagstepstart + (1+i)*deltalagstep
-
-            start = startframe
-            end = endframe - lagstep
-
-            x_lag_smoothed, corr_mean_smoothed = get_corr(corr, start, end)
-            corr_mean_smoothed_combined[i,:] = corr_mean_smoothed
-
-        with bayesian.signalmodel_correlation(corr_mean_smoothed_combined.T, -np.array([x_lag_smoothed,]*N).T, px, deltalagstep, fps, artificial=artificial) as model:
-            try:
-                trace = pm.sample(samples, tune=tune, return_inferencedata=False, cores=cores, chains=4, target_accept=0.9, callback=MyCallback(model))
-            except RuntimeError:
-                print("Divergence!")
-                return -1e5
-            except KeyboardInterrupt:
-                print("Converged!")
-
-        idata = az.from_pymc3(trace=trace, model=model) 
+        N = 8
+        deltalagstep = 5
+        lagstepstart = 30
+        x_lag, corr_mean_combined = dataprep.correlation(data, startframe, endframe, lagstepstart=lagstepstart, deltalagstep=deltalagstep, N=N)
         
-        hdi_velocity = az.hdi(idata, var_names="velocity").velocity.values[0]
-        s = hdi_velocity[1] - hdi_velocity[0]
-        result = -1/2*np.sqrt(s**2)# + 1e-4*delta
-        result = result
+        result_old = -1e6
+        
+        j = 0
+        while True:
+            try:
+                print(inname)
+                with bayesian.signalmodel_correlation(corr_mean_combined.T, -np.array([x_lag,]*N).T, px, deltalagstep, lagstepstart, fps, artificial=artificial) as model:
+                    trace = pm.sample(samples, tune=tune, return_inferencedata=False, cores=cores, chains=4, target_accept=0.9)
 
-        v = bayesian.get_mode(idata.posterior, ["velocity"])[0]*1e-6
-        print(v*1e6)
+                    idata = az.from_pymc3(trace=trace, model=model) 
 
-        return result
+                    hdi_velocity = az.hdi(idata, var_names="velocity").velocity.values[0]
+                    s = hdi_velocity[1] - hdi_velocity[0]
+                    result = -1/2*np.sqrt(s**2)# + 1e-4*delta
 
-    if not startframe and not delta:  
-        #delta = 200
+                    global best_trace
+                    global best_model
+                    if result > result_old:
+                        result_old = result
+
+                        best_trace = trace
+                        best_model = model
+                        
+                    return result
+            except Exception as e:
+                print(e)
+                if j<3:
+                    print("retry")
+                    j+=1
+                    continue
+                else:
+                    return -1e5
             
-        search_space = {"start": np.arange(100, 300, 10), "delta": np.arange(150, 250, 10)}
-        #search_space = {"start": np.arange(100, 300, 10)}
+    if not startframe and not delta:  
+        if True:      
+            search_space = {"start": np.arange(50, 300, 25), "delta": np.arange(150, 250, 25)}
+            initialize = {"warm_start": [{"start": 100, "delta": 200}]}
 
-        #opt = RandomSearchOptimizer(search_space)
-        opt = BayesianOptimizer(search_space)
-        #opt = EvolutionStrategyOptimizer(search_space)
-        #opt = SimulatedAnnealingOptimizer(search_space)
-        opt.search(functional, n_iter=20, early_stopping={"n_iter_no_change":5})
+            #opt = RandomSearchOptimizer(search_space)
+            opt = BayesianOptimizer(search_space, initialize=initialize)
+            #opt = EvolutionStrategyOptimizer(search_space)
+            #opt = SimulatedAnnealingOptimizer(search_space)
+            opt.search(functional, n_iter=1, early_stopping={"n_iter_no_change":5}, max_score=-1)
 
-        startframe = opt.best_para["start"]
-        endframe = startframe + opt.best_para["delta"]
+            startframe = opt.best_para["start"]
+            delta = opt.best_para["delta"]
+            endframe = startframe + delta
+        
+        else:
+            import nevergrad as ng
+
+            parametrization = ng.p.Instrumentation(
+                # an integer from 1 to 12
+                start=ng.p.Scalar(lower=50, upper=300).set_integer_casting(),
+                delta=ng.p.Scalar(lower=150, upper=250).set_integer_casting()
+
+            )
+
+            def functional_ng(start: int, delta: int) -> float:
+                parameters = {"start":start, "delta":delta}
+                return -1*functional(parameters)
+
+            from concurrent import futures
+            optimizer = ng.optimizers.NGOpt(parametrization=parametrization, budget=1)
+            recommendation = optimizer.minimize(functional_ng)
+
+            startframe = recommendation.kwargs["start"]
+            delta = recommendation.kwargs["delta"]
+            endframe = startframe + delta
+
+        print("Optimal values: ", startframe, endframe, delta)     
+        
     else:
         endframe = startframe + delta
-    print(startframe, endframe)
 
-    corr_mean_smoothed_combined = np.zeros((N, 250))
-
-    for i in range(0, N):
-        corr = corr_combined[i]
-        lagstep = lagstepstart + (1+i)*deltalagstep
-
-        start = startframe
-        end = endframe - lagstep
-
-        x_lag_smoothed, corr_mean_smoothed = get_corr(corr, start, end)
-        corr_mean_smoothed_combined[i,:] = corr_mean_smoothed
-
-    with bayesian.signalmodel_correlation(corr_mean_smoothed_combined.T, -np.array([x_lag_smoothed,]*N).T, px, deltalagstep, fps, artificial=artificial) as model:
-        trace = pm.sample(samples, tune=tune, return_inferencedata=False, cores=cores, chains=4, target_accept=0.9, callback=MyCallback(model))
-
-        ppc = pm.fast_sample_posterior_predictive(trace, model=model)
-        prior_pc = pm.sample_prior_predictive(50000, model=model)
-        idata = az.from_pymc3(trace=trace, posterior_predictive=ppc, model=model, prior=prior_pc) 
+    with best_model as model:
+        ppc = pm.fast_sample_posterior_predictive(best_trace, model=model)
+        idata = az.from_pymc3(trace=best_trace, posterior_predictive=ppc, model=model) 
 
     return idata, startframe, endframe 
 
 def run(inname, channel, lagstep, px, fps, cores=1):
-    j = 0
-    while True:
-        try:
-            print(inname)
-            idata_cross, min_, max_ = main(inname, channel, lagstep, px, fps, cores=cores)
-        except Exception as e:
-            print(e)
-            if j<3:
-                print("retry")
-                j+=1
-                continue
-            else:
-                break
+
+        idata_cross, min_, max_ = main(inname, channel, lagstep, px, fps, cores=cores)
+
 
         number = (inname.split("_")[-1]).split("/")[-1]
         number = number.replace(".nd2", "")
@@ -189,7 +168,6 @@ def run(inname, channel, lagstep, px, fps, cores=1):
         
         print(folder+"/idata_cross.nc")
 
-        break
 
 if __name__ == "__main__":
 
@@ -203,9 +181,10 @@ if __name__ == "__main__":
                 if(f.endswith(".nd2")):
                     innames.append(os.path.join(root,f))
 
-    innames = list(filter(lambda inname: "_1pg_l" in inname, innames))
+    innames = list(filter(lambda inname: "_0ng_l" in inname, innames))
+    #innames = list(filter(lambda inname: "001.nd2" in inname, innames))
     #innames = innames[20:]
-    #innames = innames[-5:-1]
+    #innames = innames[0:1]
     pprint(innames)
 
     # same for every experiment

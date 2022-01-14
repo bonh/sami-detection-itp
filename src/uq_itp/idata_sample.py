@@ -37,7 +37,7 @@ def main(inname, channel, px, fps, rope_velocity, idata_cross, startframe, endfr
 
     x = np.linspace(0, len(data_mean), len(data_mean))
     with bayesian.signalmodel(data_mean, x, artificial=artificial) as model:
-        trace = pm.sample(16000, tune=8000, return_inferencedata=False, chains=4, cores=1, target_accept=0.9)
+        trace = pm.sample(2000, tune=2000, return_inferencedata=False, chains=4, cores=4, target_accept=0.9)
     
         ppc = pm.fast_sample_posterior_predictive(trace, model=model)
         idata = az.from_pymc3(trace=trace, posterior_predictive=ppc, model=model) 
@@ -90,7 +90,7 @@ if __name__ == "__main__":
                 if(f.endswith(".nd2")):
                     innames.append(os.path.join(root,f))
 
-    #innames = list(filter(lambda inname: "AF_1ng" in inname, innames))
+    innames = list(filter(lambda inname: "AF647_0ng" in inname, innames))
     #innames = list(filter(lambda inname: "005" in inname, innames))
     #innames = innames[20:]
     #innames = innames[-5:-1]
@@ -107,6 +107,9 @@ if __name__ == "__main__":
     cores = mp.cpu_count()
     threads = int(cores)
 
-    with mp.Pool(threads) as pool:
-        multiple_results = [pool.apply_async(run, (inname, channel, px, fps, rope_velocity)) for inname in innames]
-        print([res.get() for res in multiple_results])
+    for inname in innames:
+        run(inname, channel, px, fps, rope_velocity)
+
+    #with mp.Pool(threads) as pool:
+    #    multiple_results = [pool.apply_async(run, (inname, channel, px, fps, rope_velocity)) for inname in innames]
+    #    print([res.get() for res in multiple_results])
