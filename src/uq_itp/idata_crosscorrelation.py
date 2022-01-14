@@ -47,7 +47,7 @@ def main(inname, channel, lagstep, px, fps, data_raw=None, startframe=None, delt
         data = data_raw
     data = dataprep.standardize(data, axis=0)
 
-    data, _, _ = dataprep.fourierfilter(data, 40, 40/8, -45, True, True)
+    data, _, _ = dataprep.fourierfilter(data, 100, 40/4, -45, True, True)
     data = dataprep.standardize(data, axis=0)
 
     global best_trace
