@@ -84,7 +84,7 @@ def shift_data(data, v, fps, px):
     data_shifted = np.zeros(data.shape)
 
     for i in range(0, data.shape[1]):
-        shift = data.shape[0] - int(i*v_px)%data.shape[0] + offset
+        shift = data.shape[0] - int(i*v_px)+offset
         if shift-offset-data.shape[0] == 0:
             print("shift is zero")
         data_shifted[:,i] = np.roll(data[:,i], shift)
