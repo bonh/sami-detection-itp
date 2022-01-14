@@ -108,24 +108,26 @@ def simplemovingmean(data, window, beta=0):
     window_ = window_ / window_.sum()
     return np.convolve(window_, data, mode='valid')
 
-def fourierfilter(data, r):
+def fourierfilter(data, rx, ry, rotation, horizontal, vertical):
     ff = np.fft.fft2(data)
     ff = np.fft.fftshift(ff)
        
     X, Y = ff.shape
         
-    window_y = sc.signal.windows.gaussian(Y, std=r/8)[:,None]
-    window_x = sc.signal.windows.gaussian(X, std=r)[:,None]
+    window_y = sc.signal.windows.gaussian(Y, std=ry)[:,None]
+    window_x = sc.signal.windows.gaussian(X, std=rx)[:,None]
     window2d = np.sqrt(np.dot(window_x, window_y.T)) # expand to 2D
-    window2d = sc.ndimage.interpolation.rotate(window2d, angle=-45, reshape=False)
+    window2d = sc.ndimage.interpolation.rotate(window2d, angle=rotation, reshape=False)
     
     # remove strong horizontal and vertical frequency components
-    window2d[int(X/2),:] = 0
-    window2d[:,int(Y/2)] = 0
+    if horizontal:
+        window2d[int(X/2),:] = 0
+    if vertical:
+        window2d[:,int(Y/2)] = 0
     
-    ff = window2d * ff
+    ffw = window2d * ff
     
-    iff = np.fft.ifftshift(ff)
+    iff = np.fft.ifftshift(ffw)
     iff = np.fft.ifft2(iff)
     
-    return np.real(iff)
+    return np.real(iff), window2d, ff
