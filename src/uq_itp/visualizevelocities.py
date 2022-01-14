@@ -27,7 +27,23 @@ concentrations = ["AF647_10ng_l", "AF647_1ng_l", "AF647_100pg_l", "AF647_10pg_l"
 
 N = 6
 
-rope_velocity = (120, 180)
+rope_velocity = (117, 184)
+
+
+# -
+
+def get_conc(concentrations):
+    array = []
+    for c in concentrations:
+        conc = c.split("_")
+        match = re.match(r"([0-9]+)([a-z]+)", conc[1], re.I)
+        conc, unit = match.groups()
+            
+        if unit == "pg":
+            conc = int(conc)/1000
+        array.append(float(conc))
+    return array
+
 
 # +
 hdis = np.zeros((len(concentrations)*N, 6))
@@ -85,17 +101,46 @@ fig.savefig("velocities.png")
 np.savetxt("velocities.csv", hdis, header="c, n, low, high, mean, nframes", delimiter=",", comments='', fmt='%5g, %1.1g, %1.1f, %1.1f, %1.1f, %1.1g')
 # -
 
-#hdis[np.where(hdis[:,4]>400),4] = np.nan
+d = np.array(hdis[:,4])
+d = d.reshape(N, -1)
+d[d == 0] = np.nan
+d[d < rope_velocity[0]] = np.nan
+d[d>rope_velocity[1]] = np.nan
+d
 
-means = np.nanmean(hdis[:,4].reshape(3,-1,N), axis=2).reshape(3,)
-stds = np.nanstd(hdis[:,4].reshape(3,-1,N), axis=2).reshape(3,)
+means = np.nanmean(d, axis=1)
+stds = np.nanstd(d, axis=1)
+print(means.shape, stds.shape)
 
-plt.scatter(hdis[:,0], hdis[:,4], label="mode")
-plt.errorbar(concentrations, means, yerr=stds.T, fmt="ro", label="mean+std", alpha=0.8)
+concs = get_conc(concentrations)
+concs
+
+plt.scatter(hdis[:,0], d, label="mode")
+plt.errorbar(concs, means, yerr=stds.T, fmt="ro", label="mean+std", alpha=0.8)
+plt.hlines([np.nanmean(d), np.nanmean(d)-np.nanstd(d), np.nanmean(d)+np.nanstd(d)], 
+           concs[-2], concs[0], colors=["red"], ls="dashed", alpha=0.8, label="mean+std, all exp. in ROPE")
+plt.hlines([rope_velocity[0], rope_velocity[1]], 
+           concs[-2], concs[0], colors=["black"], ls="dotted", alpha=0.8, label="ROPE")
 plt.xscale('log')
 plt.xlabel("concentration")
 plt.ylabel("velocity")
-#plt.ylim(200, 300);
+plt.ylim(rope_velocity[0]-20, rope_velocity[1]+20);
 plt.legend();
 plt.tight_layout()
 plt.savefig("velocities_summary.png")
+
+# +
+d = np.array(hdis)
+d[d == 0] = np.nan
+y = d[:,5].reshape(N, -1)[:-1,:]
+
+x = d[:,0].reshape(N, -1)[:-1,:]
+
+plt.scatter(x, y)
+
+plt.xscale('log')
+plt.xlabel("concentration")
+plt.ylabel("velocity")
+# -
+
+conc, i+1, hdi[0], hdi[1], mode, nframes

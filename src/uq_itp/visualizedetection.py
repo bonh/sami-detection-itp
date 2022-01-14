@@ -31,8 +31,8 @@ import dataprep
 # +
 concentrations = ["AF647_10ng_l", "AF647_1ng_l", "AF647_100pg_l", "AF647_10pg_l", "AF647_1pg_l", "AF647_0ng_l"]
 
-rope_velocity = [120, 180]
-rope_sigma = [5, 10]
+rope_velocity = [117, 184]
+rope_sigma = [5, 17]
 ref_snr = 3
 
 N = 6
@@ -167,3 +167,6 @@ for j in range(0, len(concentrations)):
 fig.suptitle("multi-frame averaged+estimated peak")
 fig.tight_layout()
 fig.savefig("peak.png")
+# -
+
+
