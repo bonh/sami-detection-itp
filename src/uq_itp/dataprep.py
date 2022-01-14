@@ -131,3 +131,29 @@ def fourierfilter(data, rx, ry, rotation, horizontal, vertical):
     iff = np.fft.ifft2(iff)
     
     return np.real(iff), window2d, ff
+
+def correlation(data, startframe, endframe, lagstepstart=30, deltalagstep=5, N=8):
+    length = int(data.shape[0]/2)
+    corr_mean_combined = np.zeros((N, length))
+
+    for i in range(0, N):
+        lagstep = lagstepstart + i*deltalagstep
+        corr = correlate_frames(data, lagstep)
+        corr = standardize(corr)
+        
+        corr_mean = np.mean(corr[:,startframe:endframe-lagstep], axis=1)
+        
+        # clean the correlation data
+        # remove peak at zero lag
+        corr_mean[length] = 0
+        #cut everything right of the middle (because we know that the velocity is positiv)
+        corr_mean = corr_mean[0:length]
+        
+        #window = 7
+        #corr_mean = simplemovingmean(corr_mean, window, beta=6)
+    
+        corr_mean_combined[i,:] = standardize(corr_mean)
+        
+    x_lag = np.arange(-length, 0)
+        
+    return x_lag, corr_mean_combined
