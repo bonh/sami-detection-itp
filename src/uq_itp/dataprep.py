@@ -100,8 +100,8 @@ def correlate_frames(data, step):
 
     return corr
 
-def standardize(data):
-    return (data-np.mean(data))/np.std(data)
+def standardize(data, axis=None):
+    return (data-np.mean(data, axis=axis))/np.std(data, axis=axis)
 
 def simplemovingmean(data, window, beta=0):
     window_ = np.kaiser(window, beta)
