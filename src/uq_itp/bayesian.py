@@ -27,9 +27,10 @@ def get_mode(data, var_names):
     _, vals = az.sel_utils.xarray_to_ndarray(data, var_names=var_names)
     return [az.plots.plot_utils.calculate_point_estimate("mode", val) for val in vals]
 
-def signalmodel_correlation(data, x, px, deltalagstep, fps, artificial=False):
+def signalmodel_correlation(data, x, px, deltalagstep, lagstepstart, fps, artificial=False):
     
     N = x.shape[1]
+    length = x.shape[0]
     
     with pm.Model() as model:
         # background
@@ -43,15 +44,18 @@ def signalmodel_correlation(data, x, px, deltalagstep, fps, artificial=False):
             background = pm.Deterministic("background", c)
 
         # sample peak
-        amp = pm.HalfNormal('amplitude', 20, shape=1)
+        amp = pm.HalfNormal('amplitude', 10, shape=1)
         measure = pm.Uniform("measure", 0, 1, shape=1)
-        cent = pm.Deterministic('centroid', measure*len(data))
-        deltacent = pm.HalfNormal("deltac", 10, shape=1)
+        cent = pm.Deterministic('centroid', measure*length)
+        if N > 1:
+            deltacent = pm.HalfNormal("deltac", 20, shape=1)
+        else:
+            deltacent = 0
         sig = pm.HalfNormal('sigma', 50, shape=1) # TODO: calculate from physics?
         #alpha = pm.Normal("alpha", 0, 0.1)
         
         def sample(amp, cent, deltacent, sig, x):
-            n = range(0,N)
+            n = np.arange(0,N)
             return amp*tt.exp(-(cent + deltacent*n - x)**2/2/sig**2)
         
         sample = pm.Deterministic("sample", sample(amp, cent, deltacent, sig, x))
@@ -60,13 +64,14 @@ def signalmodel_correlation(data, x, px, deltalagstep, fps, artificial=False):
         signal = pm.Deterministic('signal', background + sample)
 
         # prior noise
-        sigma_noise = pm.HalfNormal('sigma_noise', 1, shape=1) # TODO: can we estimate a prior value from zero concentration images?
+        sigma_noise = pm.HalfNormal('sigmanoise', 1, shape=1) # TODO: can we estimate a prior value from zero concentration images?
 
         # likelihood       
         likelihood = pm.Normal('y', mu = signal, sd=sigma_noise, observed = data)
         
         # derived quantities
-        velocity = pm.Deterministic("velocity", deltacent*px/(deltalagstep/fps)*1e6)
+        velocitypx = pm.Deterministic("velocitypx", (cent + deltacent)/(lagstepstart + deltalagstep))
+        velocity = pm.Deterministic("velocity", velocitypx*px*fps*1e6)
 
         return model
     
