@@ -77,9 +77,9 @@ def signalmodel(data, x, artificial=False):
     with pm.Model() as model:
         # background
         # f = c
-        c = pm.Normal('c', 0, 0.1)
+        c = pm.Normal('c', 0, 0.01)
         if not artificial:
-            b = pm.Normal('b', 0, 0.1)
+            b = pm.Normal('b', 0, 0.01)
             #d = pm.Normal('d', 0, 1)
             #background = pm.Deterministic("background", d*x**2+b*x+c)
             background = pm.Deterministic("background", b*x+c)
@@ -100,7 +100,7 @@ def signalmodel(data, x, artificial=False):
         signal = pm.Deterministic('signal', background + sample)
 
         # prior noise
-        sigma_noise = pm.HalfNormal('sigma_noise', 1) # TODO: can we estimate a prior value from zero concentration images?
+        sigma_noise = pm.HalfNormal('sigmanoise', 1) # TODO: can we estimate a prior value from zero concentration images?
 
         # likelihood       
         likelihood = pm.Normal('y', mu = signal, sd=sigma_noise, observed = data)
