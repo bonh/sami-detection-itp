@@ -14,28 +14,27 @@ import helper
 def main(inname, channel, times):
     data_raw = helper.raw2images(inname, channel)
     data = dataprep.averageoverheight(data_raw)
-    data = dataprep.standardize(data)
+    data = dataprep.standardize(data, axis=0)
     
-    window = 7
-    corr_mean_smoothed = dataprep.simplemovingmean(data, window, beta=6)
-    x_lag_smoothed = x_lag[int(window/2):-int(window/2)]
-
+    number = (inname.split("_")[-1]).split("/")[-1]
+    number = number.replace(".nd2", "")
+    folder = (inname.split("/")[-2])
+    folder = folder + "/" + number
+    
+    from pathlib import Path
+    Path(folder).mkdir(parents=True, exist_ok=True)
+    
     for time in times:
         d = data[:,time]
-        x = np.linspace(0, len(d), len(d))
-        with bayesian.signalmodel(d, x) as model:
-            trace = pm.sample(4000, tune=2000, return_inferencedata=False, cores=4, target_accept=0.9)
-    
-            ppc = pm.fast_sample_posterior_predictive(trace, model=model)
-            idata = az.from_pymc3(trace=trace, posterior_predictive=ppc, model=model) 
+        
+        x = np.arange(0, d.shape[0])
+        with bayesian.signalmodel(d, x, artificial=True) as model:
+            trace = pm.sample(4000, tune=4000, return_inferencedata=False, cores=4, target_accept=0.9)
 
-            
-            number = (inname.split("_")[-1]).split("/")[-1]
-            number = number.replace(".nd2", "")
-            folder = (inname.split("/")[-2])
-            folder = folder + "/" + number
-            
-            idata.to_netcdf(folder+"/idata_single_t{}.nc".format(time))
+            ppc = pm.fast_sample_posterior_predictive(trace, model=model)
+            idata_single = az.from_pymc3(trace=trace, posterior_predictive=ppc, model=model)       
+        
+            idata_single.to_netcdf(folder+"/idata_single_t{}.nc".format(time))
 
 if __name__ == "__main__":
 
@@ -48,7 +47,7 @@ if __name__ == "__main__":
                 if(f.endswith(".nd2")):
                     innames.append(os.path.join(root,f))
 
-    #innames = list(filter(lambda inname: "AF_1ng" in inname, innames))
+    innames = list(filter(lambda inname: "AF_10ng" in inname, innames))
     #innames = list(filter(lambda inname: "005" in inname, innames))
     #innames = innames[20:]
     #innames = innames[-5:-1]
@@ -58,7 +57,6 @@ if __name__ == "__main__":
 
     channel = [27, 27]
 
-    
     for inname in innames:
         j = 0
         while True:
@@ -69,7 +67,8 @@ if __name__ == "__main__":
 
             except AttributeError:
                 break
-            except:
+            except Exception as e:
+                print(e)
                 if j<3:
                     print("retry")
                     j+=1
