@@ -28,8 +28,17 @@ import bayesian
 import helper
 import dataprep
 
+
 # +
-concentrations = ["AF647_10ng_l", "AF647_1ng_l", "AF647_100pg_l", "AF647_10pg_l", "AF647_1pg_l", "AF647_0ng_l"]
+def get_conc_name(concentration):
+    conc = concentration.split("_")
+    match = re.match(r"([0-9]+)([a-z]+)", conc[1], re.I)
+    conc, unit = match.groups()
+            
+    if unit == "pg":
+        conc = int(conc)/1000
+        
+    return concconcentrations = ["AF647_10ng_l", "AF647_1ng_l", "AF647_100pg_l", "AF647_10pg_l", "AF647_1pg_l", "AF647_0ng_l"]
 
 rope_velocity = [117, 184]
 rope_sigma = [5, 17]
