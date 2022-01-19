@@ -105,8 +105,9 @@ fig.tight_layout()
 fig.savefig("spread.png")
 
 # +
-hdis = np.zeros((len(concentrations)*N, N))
-print(hdis.shape)
+snr = np.zeros((len(concentrations)*N, N))
+snr += np.nan
+
 fig, axs = plt.subplots(len(concentrations), N, figsize=(20,8))
 for j in range(0, len(concentrations)):
     for i in range(0, N):
@@ -115,13 +116,15 @@ for j in range(0, len(concentrations)):
                 
             inname = "./{}/00{}/idata.nc".format(concentrations[j], i+1)
             idata = az.InferenceData.from_netcdf(inname) 
-            
-            hdi = az.hdi(idata, hdi_prob=.95, var_names="snr")
 
             ax = az.plot_posterior(idata, var_names=["snr"]
                         , kind="kde", point_estimate='mode', hdi_prob=.95, ax=axs[j,i], textsize=8, ref_val=ref_snr);    
             ax.set_title("")
             #ax.set_xlim(6,14)
+                
+            hdi = az.hdi(idata, hdi_prob=.95, var_names="snr")
+            p
+            
         except FileNotFoundError:
             print(inname)
             axs[j,i].axis("off")
@@ -140,7 +143,7 @@ fig.savefig("snr.png")
 #np.savetxt("velocities.csv", hdis, header="c, n, low, high, mean", delimiter=",", comments='', fmt='%1.1f')
 
 # +
-hdis = np.zeros((len(concentrations)*N, N))
+hdis = np.zeros((len(concentrations)*N, 3))
 print(hdis.shape)
 fig, axs = plt.subplots(len(concentrations), N, figsize=(20,8))
 for j in range(0, len(concentrations)):
@@ -158,6 +161,8 @@ for j in range(0, len(concentrations)):
             axs[j,i].plot(x, data, alpha=0.8)
             axs[j,i].plot(x, idata.posterior_predictive.mean(("chain", "draw")).y, label="fit", color="red")
             axs[j,i].fill_between(x, hdi["y"][:,0], hdi["y"][:,1], alpha=0.3, label=".95 HDI", color="red")
+            
+            
             
             #mode = bayesian.get_mode(idata.posterior, ["snr"])[0]
 

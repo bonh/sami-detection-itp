@@ -148,7 +148,7 @@ for j in range(0, len(concentrations)):
     conc = get_conc_name(concentrations[j])
     for i in range(0, N):
         results[j*N+i,0:2] = np.array([conc, i+1])
-        for time in times:
+        for t, time in times:
             try:
                 inname = "./{}/00{}/idata_single_t{}.nc".format(concentrations[j], i+1, time)
                 idata = az.InferenceData.from_netcdf(inname)
