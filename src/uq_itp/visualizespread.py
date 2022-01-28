@@ -32,17 +32,15 @@ rope_sigma = (4, 17)
 
 # -
 
-def get_conc(concentrations):
-    array = []
-    for c in concentrations:
-        conc = c.split("_")
-        match = re.match(r"([0-9]+)([a-z]+)", conc[1], re.I)
-        conc, unit = match.groups()
+def get_conc_name(concentration):
+    conc = concentration.split("_")
+    match = re.match(r"([0-9]+)([a-z]+)", conc[1], re.I)
+    conc, unit = match.groups()
             
-        if unit == "pg":
-            conc = int(conc)/1000
-        array.append(float(conc))
-    return array
+    if unit == "pg":
+        conc = int(conc)/1000
+        
+    return conc
 
 
 # +
