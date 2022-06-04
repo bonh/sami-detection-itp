@@ -28,17 +28,8 @@ import bayesian
 import helper
 import dataprep
 
-
 # +
-def get_conc_name(concentration):
-    conc = concentration.split("_")
-    match = re.match(r"([0-9]+)([a-z]+)", conc[1], re.I)
-    conc, unit = match.groups()
-            
-    if unit == "pg":
-        conc = int(conc)/1000
-        
-    return concconcentrations = ["AF647_10ng_l", "AF647_1ng_l", "AF647_100pg_l", "AF647_10pg_l", "AF647_1pg_l", "AF647_0ng_l"]
+concentrations = ["AF647_10ng_l", "AF647_1ng_l", "AF647_100pg_l", "AF647_10pg_l", "AF647_1pg_l", "AF647_0ng_l"]
 
 rope_velocity = [117, 184]
 rope_sigma = [5, 17]
@@ -123,10 +114,10 @@ for j in range(0, len(concentrations)):
             #ax.set_xlim(6,14)
                 
             hdi = az.hdi(idata, hdi_prob=.95, var_names="snr")
-            p
+            print(hdi)
             
-        except FileNotFoundError:
-            print(inname)
+        except FileNotFoundError as e:
+            print(e)
             axs[j,i].axis("off")
             axs[j,i].text(0.5, 0.5, 'no sample present\n or sampling failed', horizontalalignment='center', verticalalignment='center')
             continue 

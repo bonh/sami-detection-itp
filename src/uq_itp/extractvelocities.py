@@ -20,7 +20,7 @@ def get_conc_name(concentration):
 
 concentrations = ["AF647_10ng_l", "AF647_1ng_l", "AF647_100pg_l", "AF647_10pg_l", "AF647_1pg_l", "AF647_0ng_l"]
 
-N = 6
+N = 7
 
 velocities = np.zeros((len(concentrations),N, 6))
 velocities += np.nan
@@ -39,14 +39,12 @@ for j in range(0, len(concentrations)):
 
             mode = bayesian.get_mode(idata.posterior, ["velocity"])[0]
 
-            with open("./{}/00{}/intervals.dat".format(concentrations[j], i+1)) as f:
-                min_, max_ = [int(x) for x in next(f).split()]
-            nframes = max_-min_
-
+            nframes = 200
             velocities[j,i,:] = np.array([conc, i+1, mode, low, high, nframes])
         except FileNotFoundError as e:
             print(e)
             continue 
 
+print(velocities)
 velocities = velocities.reshape(-1, 6)
-np.savetxt("velocities.csv", velocities, header="c, n, mode, low, high, nframes", delimiter=",", comments='', fmt='%5g, %1.1g, %1.3g, %1.3g, %1.3g, %1.3g')
+np.savetxt("velocities.csv", velocities, header="c, n, mode, low, high, nframes", delimiter=",", comments='', fmt='%5g, %1.1g, %1.5g, %1.5g, %1.5g, %1.3g')

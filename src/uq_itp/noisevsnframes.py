@@ -27,29 +27,64 @@ import pymc3 as pm
 import arviz as az
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
+import matplotlib as mpl
 
 import dataprep
 import bayesian
 import helper
 
 # +
-#inname = "/home/cb51neqa/projects/itp/exp_data/ITP_AF647_5µA/AF_10ng_l/001.nd2"
-inname = "/home/cb51neqa/projects/itp/exp_data/ITP_AF647_5µA/AF_0.1ng_l/001.nd2"
+#mpl.style.use(['science'])
+#
+#mpl.rcParams['figure.dpi'] = 300
+#figsize = np.array([3.42,2.20])
+#mpl.rcParams["figure.figsize"] = figsize
+#
+#mpl.rcParams["image.origin"] = "lower"
+#
+#mpl.rcParams['axes.titlesize'] = 9
+#mpl.rcParams['axes.labelsize'] = 8
+#mpl.rcParams['lines.markersize'] = 5
+#
+#mpl.use("pgf")
+#
+#pgf_with_latex = {                      # setup matplotlib to use latex for output
+#    "pgf.texsystem": "pdflatex",        # change this if using xetex or lautex
+#    "text.usetex": True,
+#    "pgf.rcfonts": False,
+#    "font.family": "sans-serif",
+#    "font.sans-serif": ["Arial"],
+#    "pgf.preamble": "\n".join([ # plots will use this preamble
+#        r"\usepackage[utf8]{inputenc}",
+#        r"\usepackage[T1]{fontenc}",
+#        r"\usepackage[detect-all]{siunitx}",
+#        r'\usepackage{mathtools}',
+#        r'\DeclareSIUnit\pixel{px}'
+#        ,r"\usepackage{sansmathfonts}"
+#        ,r"\usepackage[scaled=0.95]{helvet}"
+#        ,r"\renewcommand{\rmdefault}{\sfdefault}"
+#        ])
+#    }
+#
+#plt.rcParams.update(pgf_with_latex)
+
+
+# +
+basepath = "/home/cb51neqa/projects/itp/exp_data/2021-12-20/5µA/"
+concentration = "AF647_10pg_l/"
+number = "005.nd2"
+inname = basepath + concentration + number
 
 channel_lower = 27
 channel_upper = 27
 
-startframe = 150
-endframe = 250
+startframe = 100
+endframe = 300
 
 fps = 46 # frames per second (1/s)
 px = 1.6e-6 # size of pixel (m/px)
 
-sigma_mean = 10
-rope_sigma = (5,15)
-rope_velocity = (200,250)
-
-time = 150
+time = 200
 
 # +
 data_raw = helper.raw2images(inname, (channel_lower, channel_upper))
@@ -60,78 +95,61 @@ nframes = data_raw.shape[2]
 print("height = {}, length = {}, nframes = {}".format(height, length, nframes))
 # -
 
-tmp = dataprep.averageoverheight(data_raw)
-scaler = preprocessing.StandardScaler().fit(tmp)
-data = scaler.transform(tmp)
+data = dataprep.averageoverheight(data_raw)
+data = dataprep.standardize(data, axis=0)
 
 # +
-lagstep = 30 
-corr = dataprep.correlate_frames(data, lagstep)
-
-scaler = preprocessing.StandardScaler().fit(corr)
-corr = scaler.transform(corr)
-
-corr_mean = np.mean(corr[:,startframe:endframe], axis=1).reshape(-1, 1)
-x_lag = np.linspace(-corr_mean.shape[0]/2, corr_mean.shape[0]/2, corr_mean.shape[0])
-
-# clean the correlation data
-# remove peak at zero lag
-corr_mean[int(corr_mean.shape[0]/2)] = 0
-#cut everything right of the middle (because we know that the velocity is positiv)
-corr_mean = corr_mean[0:int(corr_mean.shape[0]/2)]
-
-x_lag = x_lag[0:int(corr_mean.shape[0])]
-
-scaler = preprocessing.StandardScaler().fit(corr_mean)
-corr_mean = scaler.transform(corr_mean).flatten()
-# -
-
-with bayesian.signalmodel_correlation(corr_mean, -x_lag, px, lagstep, fps) as model:
-    trace = pm.sample(return_inferencedata=False, cores=4, target_accept=0.9)
-      
-    ppc = pm.fast_sample_posterior_predictive(trace, model=model)
-    idata = az.from_pymc3(trace=trace, posterior_predictive=ppc, model=model) 
-    summary = az.summary(idata, var_names=["sigma_noise", "sigma", "centroid", "amplitude", "c", "b", "velocity"])
-    
-    hdi = az.hdi(idata.posterior_predictive, hdi_prob=.95)
-
-v = summary["mean"]["velocity"]*1e-6
-print("Mean velocity of the sample is v = {} $microm /s$.".format(v*1e6))
+v = 140e-6
 data_shifted = dataprep.shift_data(data, v, fps, px)
 
+data_fft_shifted, mask_shifted, ff_shifted = dataprep.fourierfilter(data_shifted, 30, 30, 45, True, False)
+#data_fft_shifted, mask_shifted, ff_shifted = dataprep.fourierfilter(data_shifted, 3000, 3000, 0, False, False)
+#data_fft_shifted = dataprep.standardize(data_fft_shifted)
+data_fft_shifted = data_shifted
+# -
+
+plt.imshow(data_fft_shifted)
+
+everynth = np.array([20, 10, 4, 2, 1])
+(endframe-startframe)/everynth
+
 # +
-frames2try = np.linspace(startframe+10, endframe, 6, dtype=int)
-print(frames2try)
-N = len(frames2try)
+fig, ax = plt.subplots(len(everynth))
+
+for i, n in enumerate(everynth):
+    d = data_fft_shifted[:,startframe:endframe:n]
+    print(d.shape)
+    data_mean = np.mean(d, axis=1)
+    
+    ax[i].plot(data_mean)
+
+# +
+N = len(everynth)
 
 j = 0
 
 idatas = []
-snr = np.zeros((4,N))
+snr = np.zeros((2,N))
 for i in range(0,N):
     j = 0
     while True:
         try:
-            print(frames2try[i]-startframe)
-            tmp = data_shifted[:, startframe:frames2try[i]]
-            avg = np.mean(tmp, axis=1).reshape(-1,1)
+            d = data_fft_shifted[:,startframe:endframe:everynth[i]]
+            n = d.shape[1]
+            print(startframe, endframe, everynth[i], n)
+            
+            data_mean = np.mean(d, axis=1)
+            data_mean = dataprep.standardize(data_mean)
     
-            scaler = preprocessing.StandardScaler().fit(avg)
-            avg = scaler.transform(avg).flatten()
-    
-            x = np.linspace(0, len(avg), len(avg))
-            with bayesian.signalmodel(avg, x) as model:
-                trace = pm.sample(2000, return_inferencedata=False, cores=4, target_accept=0.9)
-    
-                ppc = pm.fast_sample_posterior_predictive(trace, model=model)
-                idata = az.from_pymc3(trace=trace, posterior_predictive=ppc, model=model) 
-                summary = az.summary(idata, var_names=["sigma_noise", "sigma", "centroid", "amplitude", "c", "fmax", "snr", "alpha"])
-        
-            mean = summary.loc[:, "mean"]
-            hdi_low = summary.loc[:, "hdi_3%"]
-            hdi_high = summary.loc[:, "hdi_97%"]
+            x = np.arange(0, data_mean.shape[0])
+            with bayesian.signalmodel(data_mean, x, artificial=True) as model:
+                trace = pm.sample(2000, tune=2000, return_inferencedata=False, cores=4, target_accept=0.9)
 
-            snr[:,i] = [frames2try[i]-startframe, mean["snr"], hdi_low["snr"], hdi_high["snr"]]
+                idata = az.from_pymc3(trace=trace, model=model) 
+        
+                mode = bayesian.get_mode(idata.posterior, ["snr"])[0]
+
+            snr[:,i] = [n, mode]
             idatas.append(idata)
         except:
             if j<3:
@@ -141,49 +159,40 @@ for i in range(0,N):
             else:
                 break
         break
+# -
+
+snr
+
+factor = snr[1,:]/np.sqrt(snr[0,:])
+print(np.mean(factor), np.std(factor))
+factor = np.mean(factor)
+std = np.std(factor)
 
 # +
-fig, ax1 = plt.subplots()
+plt.figure(figsize=(figsize[0], figsize[1]))
 
-x = snr[0,:]
-y = snr[1,:]
-yerr = np.abs(snr[2:4,:]-y)
-ax1.plot(x, y, marker="o", color="red", linestyle="None", label="snr and .97 HDI")
-x_ = np.linspace(0, x[-1], 100)
-ax1.plot(x_, y[-3]*np.sqrt(x_/x[-3]), label="$\propto \sqrt{n}$") 
-ax1.annotate(r"$\mathit{snr} \propto N$", xy=(50, 11), xytext=(40, 15), arrowprops=dict(arrowstyle="->"))
-ax1.set_xlabel("number of frames $N$")
-ax1.set_ylabel("signal-to-noise $snr$")
+x = np.logspace(0, 3, 2100)
+plt.plot(x, factor*np.sqrt(x), color="black")#'#BBBBBB')
+plt.annotate(r"$\mathclap{\sim \sqrt{N_n}}$", (100, factor*np.sqrt(100)), (25,-25), textcoords='offset points', arrowprops=dict(arrowstyle="->"),horizontalalignment='center')
 
-def bla(endframe):
-    tmp = data_shifted[:, startframe:endframe]
-    avg = np.mean(tmp, axis=1).reshape(-1,1)
-    
-    scaler = preprocessing.StandardScaler().fit(avg)
-    return scaler.transform(avg).flatten()
+plt.plot(snr[0,:], snr[1,:], "o", label=r"SAMI with \SI{0.1}{\nano\gram\per\liter}", color="#EE6677")
 
-x = np.linspace(0, len(avg), len(avg))
+plt.legend(markerscale=1.0, labelspacing=0.25, handletextpad=0.05)
 
-left, bottom, width, height = [0.15, 0.65, 0.2, 0.2]
-ax2 = fig.add_axes([left, bottom, width, height])
-ax2.plot(x[::5], bla(frames2try[0])[::5], alpha=0.5)
-ax2.plot(x, idatas[0].posterior_predictive.mean(("chain", "draw"))["y"], color="red")
-ax1.annotate("", xy=(10, 10.5), xytext=(10, 5), arrowprops=dict(arrowstyle="<-"))
-ax2.get_yaxis().set_ticks([])
-ax2.get_xaxis().set_ticks([])
+plt.xlabel("$N_n$ (-)")
+plt.ylabel("$\mathit{SNR}$ (-)");
+plt.xscale("log")
+#plt.xlim(np.min(x),1000)
+#plt.ylim(-0.25, 10.25)
+#plt.xticks([1, 10, 100, 1000])
+#plt.yticks([0, 4, 8])
 
-left, bottom, width, height = [0.67, 0.2, 0.2, 0.2]
-ax2 = fig.add_axes([left, bottom, width, height])
-ax2.plot(x[::5], bla(frames2try[-1])[::5], alpha=0.5)
-ax2.plot(x, idatas[-1].posterior_predictive.mean(("chain", "draw"))["y"], color="red")
-ax1.annotate("", xy=(90, 6), xytext=(100, 14), arrowprops=dict(arrowstyle="<-"))
-ax2.get_yaxis().set_ticks([])
-ax2.get_xaxis().set_ticks([]);
+plt.tight_layout()
+plt.savefig("snrvsframes.pdf")
+# -
+plt.figure()
+plt.plot(idatas[0].observed_data.to_array().T)
+plt.plot(idatas[-1].observed_data.to_array().T)
+plt.show()
 
-left, bottom, width, height = [0.4, 0.2, 0.2, 0.2]
-ax2 = fig.add_axes([left, bottom, width, height])
-ax2.plot(x[::5], bla(frames2try[-4])[::5], alpha=0.5)
-ax2.plot(x, idatas[-4].posterior_predictive.mean(("chain", "draw"))["y"], color="red")
-ax1.annotate("", xy=(50, 6), xytext=(47, 9.5), arrowprops=dict(arrowstyle="<-"))
-ax2.get_yaxis().set_ticks([])
-ax2.get_xaxis().set_ticks([]);
+p

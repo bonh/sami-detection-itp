@@ -16,11 +16,32 @@
 # +
 import arviz as az
 import matplotlib.pyplot as plt
+import matplotlib as mpl
 import os
 import numpy as np
 import bayesian
 
 import re
+
+# +
+mpl.style.use(['science'])
+
+mpl.rcParams['figure.dpi'] = 150
+px = 1/plt.rcParams['figure.dpi']  # pixel in inches
+figsize = np.array([700*px,500*px])
+mpl.rcParams["figure.figsize"] = figsize
+
+#mpl.rcParams['text.usetex'] = True
+#mpl.rcParams['text.latex.preamble'] = r'\usepackage{mathtools}'
+
+mpl.rcParams["image.origin"] = "lower"
+
+mpl.rcParams['axes.titlesize'] = 10
+
+mpl.rcParams["axes.spines.right"] = True
+mpl.rcParams["axes.spines.top"] = True
+mpl.rcParams["xtick.top"] = False
+mpl.rcParams["ytick.right"] = False
 
 # +
 concentrations = ["AF647_10ng_l", "AF647_1ng_l", "AF647_100pg_l", "AF647_10pg_l", "AF647_1pg_l", "AF647_0ng_l"]
@@ -107,6 +128,8 @@ hdi_delta = hdi_delta[:-1,:]
 mean_hdi_delta = np.nanmean(hdi_delta, axis=1)
 std_hdi_delta = np.nanstd(hdi_delta, axis=1)
 
+mean_hdi_delta, std_hdi_delta
+
 n = np.sum(~np.isnan(mode), axis=1)
 n
 
@@ -115,7 +138,7 @@ r = np.array([10, 1, 0.1, 0.01, 0.001]).flatten()
 
 fig, ax = plt.subplots()
 
-ax.scatter(np.repeat(r, 6), mode, label="modes", color="red", alpha=0.3)
+ax.scatter(np.repeat(r, 6), mode, label="modes", c="red", marker="x",alpha=0.3)
 
 ax.errorbar(r, mean, yerr=std, fmt="ro", label="mean+std (mode)", alpha=1)
 
@@ -125,28 +148,28 @@ for i, txt in enumerate(n):
 ax.annotate("includes only measurements with\nsuccessful detection (see number near point)", (1e-3,185))
 
 ax.plot(r, 0*r+rope_sigma[1], ls="dashed", color="black", alpha=0.5)
-ax.annotate("ROPE", (r[-1],rope_sigma[1]-4))
+ax.annotate("ROPE", (r[-1],rope_sigma[1]-0.6))
 ax.plot(r, 0*r+rope_sigma[0], ls="dashed", color="black", alpha=0.5)
-ax.annotate("ROPE", (r[-1],rope_sigma[0]+1))
+ax.annotate("ROPE", (r[-1],rope_sigma[0]+0.1))
     
 ax.set_xscale("log")
+ax.set_ylim(rope_sigma[0]-rope_sigma[1]*0.2,rope_sigma[1]*1.2)
 #ax.yscale("log")
-
-#ax.set_ylim(rope_velocity[0]-20, rope_velocity[1]+20);
 
 ax.set_xlabel("concentration (ng/L)")
 ax.set_ylabel("spread (px)");
 
 ax2 = ax.twinx()
-ax2.scatter(np.repeat(r, 6), hdi_delta, label="$\Delta$ hdi", color="green", alpha=0.3)
+ax2.scatter(np.repeat(r, 6), hdi_delta, label="$\Delta$ hdi", color="green", alpha=0.3, marker="x")
 ax2.errorbar(r, mean_hdi_delta, yerr=std_hdi_delta, fmt="go", label="mean+std ($\Delta$ hdi)", alpha=1)
-ax2.set_ylabel("spread uncertainty (% of mode)");
+ax2.set_ylabel("spread uncertainty (\% of mode)");
+#ax2.set_ylim(0,35)
 #ax2.set_yscale("log")
 
-fig.legend(bbox_to_anchor=(.68, 0.95) )
+fig.legend(bbox_to_anchor=(.9, 0.82), fontsize=8, frameon=True)
 
-fig.tight_layout()
-fig.savefig("velocities_summary.png")
+#fig.tight_layout()
+#fig.savefig("velocities_summary.png")
 # -
 
 
