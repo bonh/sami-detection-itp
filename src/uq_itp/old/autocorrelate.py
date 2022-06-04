@@ -29,13 +29,13 @@ import pymc3 as pm
 from collections import OrderedDict
 
 # +
-inname = "/home/cb51neqa/projects/itp/exp_data/ITP_AF647_5µA/AF_1ng_l/005.nd2"
+inname = "/home/cb51neqa/projects/itp/exp_data/ITP_AF647_5µA/AF_0.1ng_l/005.nd2"
 
 channel_lower = 27
 channel_upper = 27
 
-startframe = 0
-endframe = -1
+startframe = 150
+endframe = 200
 
 fps = 46
 px = 1.6e-6
@@ -43,7 +43,7 @@ px = 1.6e-6
 
 data_raw = input.load_nd_data(inname)
 data_raw = input.cuttochannel(data_raw, channel_lower, channel_upper)
-background = np.mean(data_raw[:,:,0:10],axis=2)
+background = np.mean(data_raw[:,:,0:50],axis=2)
 data_raw = input.substractbackground(data_raw, background)
 data = input.averageoverheight(data_raw)
 
@@ -129,12 +129,12 @@ models = OrderedDict()
 
 x = np.linspace(0, len(avg), len(avg))
 with create_model(avg, x) as models[0]:
-    trace = pm.sample(10000, return_inferencedata=True, cores=4)
-    #trace = pm.sample_smc(1000, random_seed=42, parallel=True)
+    #trace = pm.sample(10000, return_inferencedata=True, cores=4)
+    trace = pm.sample_smc(1000, random_seed=42, parallel=True)
   
 with create_model_noiseonly(avg) as models[1]:
-    trace_noiseonly = pm.sample(10000, return_inferencedata=True, cores=4)
-    #trace_noiseonly = pm.sample_smc(1000, random_seed=42, parallel=True)
+    #trace_noiseonly = pm.sample(10000, return_inferencedata=True, cores=4)
+    trace_noiseonly = pm.sample_smc(1000, random_seed=42, parallel=True)
 # -
 
 summary = az.summary(trace, var_names=["amplitude", "centroid", "sigma", "baseline", "sigma_noise"])
@@ -143,10 +143,13 @@ summary
 summary_noiseonly = az.summary(trace_noiseonly, var_names=["baseline", "sigma_noise"])
 summary_noiseonly
 
-dfloo = pm.compare({"sample":trace, "noiseonly":trace_noiseonly}, ic="loo")
-dfloo
+dfwaic = pm.compare({"sample":trace, "noiseonly":trace_noiseonly}, ic="waic")
+dfwaic
 
-az.plot_compare(dfloo, insample_dev=False);
+az.plot_compare(dfwaic, insample_dev=False);
+
+BF_smc = np.exp(trace.report.log_marginal_likelihood - trace_noiseonly.report.log_marginal_likelihood)
+BF_smc
 
 plt.plot(avg, label="shifted/cut/averaged")
 map_estimate = summary.loc[:, "mean"]
@@ -154,3 +157,5 @@ plt.plot(
     model_signal(map_estimate["amplitude"], map_estimate["centroid"], map_estimate["sigma"], map_estimate["baseline"], x), label="signal");
 plt.plot(x*0+summary_noiseonly.loc[:,"mean"]["baseline"], label="no signal");
 plt.legend();
+
+
