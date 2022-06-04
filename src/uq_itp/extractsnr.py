@@ -20,7 +20,7 @@ def get_conc_name(concentration):
 
 concentrations = ["AF647_10ng_l", "AF647_1ng_l", "AF647_100pg_l", "AF647_10pg_l", "AF647_1pg_l", "AF647_0ng_l"]
 
-N = 6
+N = 7
 
 snr = np.zeros((len(concentrations),N, 5))
 snr += np.nan

@@ -19,9 +19,15 @@ def check_rope(values, rope):
     prob = ((values > rope[0]) & (values <= rope[1])).mean()
     return prob.data
 
+def check_rope_hdi(hdi, rope):
+    return hdi[0]>=rope[0] and hdi[1]<=rope[1]
+
 def check_refvalue(values, refvalue):
     prob = (values > refvalue).mean()
     return prob.data
+
+def check_refvalue_hdilow(hdilow, refvalue):
+    return hdilow>=refvalue
 
 def get_mode(data, var_names):
     _, vals = az.sel_utils.xarray_to_ndarray(data, var_names=var_names)
@@ -78,6 +84,16 @@ def signalmodel_correlation(data, x, px, deltalagstep, lagstepstart, fps, artifi
 def model_sample(a, c, w, alpha, x):       
     return a*tt.exp(-(c - x)**2/2/w**2) * (1-tt.erf((alpha*(c - x))/tt.sqrt(2)/w))
 
+# derived quantities
+def fmax(A, c, sigma, a):
+    erf = tt.erf
+    sqrt = tt.sqrt
+    pi = np.pi
+    exp = tt.exp
+    Abs = pm.math.abs_
+    sign = pm.math.sgn
+    return A*(erf(sqrt(2)*a*(-sqrt(2)*a*(2 - pi/2)/(pi**(3/2)*sqrt(a**2 + 1)*(-2*a**2/(pi*(a**2 + 1)) + 1)**1.0) + sqrt(2)*a/(sqrt(pi)*sqrt(a**2 + 1)) - exp(-2*pi/Abs(a))*sign(a)/2)/2) + 1)*exp(-(-sqrt(2)*a*(2 - pi/2)/(pi**(3/2)*sqrt(a**2 + 1)*(-2*a**2/(pi*(a**2 + 1)) + 1)**1.0) + sqrt(2)*a/(sqrt(pi)*sqrt(a**2 + 1)) - exp(-2*pi/Abs(a))*sign(a)/2)**2/2)
+
 def signalmodel(data, x, artificial=False):
     with pm.Model() as model:
         # background
@@ -105,22 +121,12 @@ def signalmodel(data, x, artificial=False):
         signal = pm.Deterministic('signal', background + sample)
 
         # prior noise
-        sigma_noise = pm.HalfNormal('sigmanoise', 1) # TODO: can we estimate a prior value from zero concentration images?
+        sigma_noise = pm.HalfNormal('sigmanoise', 1.0) # TODO: can we estimate a prior value from zero concentration images?
 
         # likelihood       
         likelihood = pm.Normal('y', mu = signal, sd=sigma_noise, observed = data)
-        
-        # derived quantities
-        def fmax(A, c, sigma, a):
-            erf = tt.erf
-            sqrt = tt.sqrt
-            pi = np.pi
-            exp = tt.exp
-            Abs = pm.math.abs_
-            sign = pm.math.sgn
-            return A*(erf(sqrt(2)*a*(-sqrt(2)*a*(2 - pi/2)/(pi**(3/2)*sqrt(a**2 + 1)*(-2*a**2/(pi*(a**2 + 1)) + 1)**1.0) + sqrt(2)*a/(sqrt(pi)*sqrt(a**2 + 1)) - exp(-2*pi/Abs(a))*sign(a)/2)/2) + 1)*exp(-(-sqrt(2)*a*(2 - pi/2)/(pi**(3/2)*sqrt(a**2 + 1)*(-2*a**2/(pi*(a**2 + 1)) + 1)**1.0) + sqrt(2)*a/(sqrt(pi)*sqrt(a**2 + 1)) - exp(-2*pi/Abs(a))*sign(a)/2)**2/2)
 
-        fmax = pm.Deterministic("fmax", fmax(amp, cent, sig, alpha))
-        snr = pm.Deterministic("snr", fmax/sigma_noise)
+        fmax_ = pm.Deterministic("fmax", fmax(amp, cent, sig, alpha))
+        snr = pm.Deterministic("snr", fmax_/sigma_noise)
 
         return model

@@ -101,46 +101,67 @@ fig.savefig("velocities.png")
 np.savetxt("velocities.csv", hdis, header="c, n, low, high, mean, nframes", delimiter=",", comments='', fmt='%5g, %1.1g, %1.1f, %1.1f, %1.1f, %1.1g')
 # -
 
-d = np.array(hdis[:,4])
-d = d.reshape(N, -1)
-d[d == 0] = np.nan
-d[d < rope_velocity[0]] = np.nan
-d[d>rope_velocity[1]] = np.nan
+d = np.loadtxt("detection.csv", delimiter=",", skiprows=1)
+d = np.sum(d[:,2:5], axis=1)
+d[d != 3] = np.nan
+d[d == 3] = 1
 d
 
-means = np.nanmean(d, axis=1)
-stds = np.nanstd(d, axis=1)
-print(means.shape, stds.shape)
+velocities = np.loadtxt("velocities.csv", delimiter=",", skiprows=1)
 
-concs = get_conc(concentrations)
-concs
+mode = velocities[:,4]*d
+mode = mode.reshape(6, -1)
+mode = mode[:-1,:]
+mean = np.nanmean(mode, axis=1)
+std = np.nanstd(mode, axis=1)
+print(mean.shape, std.shape)
 
-plt.scatter(hdis[:,0], d, label="mode")
-plt.errorbar(concs, means, yerr=stds.T, fmt="ro", label="mean+std", alpha=0.8)
-plt.hlines([np.nanmean(d), np.nanmean(d)-np.nanstd(d), np.nanmean(d)+np.nanstd(d)], 
-           concs[-2], concs[0], colors=["red"], ls="dashed", alpha=0.8, label="mean+std, all exp. in ROPE")
-plt.hlines([rope_velocity[0], rope_velocity[1]], 
-           concs[-2], concs[0], colors=["black"], ls="dotted", alpha=0.8, label="ROPE")
-plt.xscale('log')
-plt.xlabel("concentration")
-plt.ylabel("velocity")
-plt.ylim(rope_velocity[0]-20, rope_velocity[1]+20);
-plt.legend();
-plt.tight_layout()
-plt.savefig("velocities_summary.png")
+hdi_delta = (velocities[:,3]-velocities[:,2])/velocities[:,4]*100*d
+hdi_delta = hdi_delta.reshape(6, -1)
+hdi_delta = hdi_delta[:-1,:]
+mean_hdi_delta = np.nanmean(hdi_delta, axis=1)
+std_hdi_delta = np.nanstd(hdi_delta, axis=1)
+
+n = np.sum(~np.isnan(mode), axis=1)
+n
 
 # +
-d = np.array(hdis)
-d[d == 0] = np.nan
-y = d[:,5].reshape(N, -1)[:-1,:]
+r = np.array([10, 1, 0.1, 0.01, 0.001]).flatten()
 
-x = d[:,0].reshape(N, -1)[:-1,:]
+fig, ax = plt.subplots()
 
-plt.scatter(x, y)
+ax.scatter(np.repeat(r, 6), mode, label="modes", color="red", alpha=0.3)
 
-plt.xscale('log')
-plt.xlabel("concentration")
-plt.ylabel("velocity")
+ax.errorbar(r, mean, yerr=std, fmt="ro", label="mean+std (mode)", alpha=1)
+
+for i, txt in enumerate(n):
+    ax.annotate(txt, (r[i], mean[i]), xytext=(6, 5), textcoords='offset points')
+
+ax.annotate("includes only measurements with\nsuccessful detection (see number near point)", (1e-3,185))
+
+ax.plot(r, 0*r+rope_velocity[1], ls="dashed", color="black", alpha=0.5)
+ax.annotate("ROPE", (r[-1],rope_velocity[1]-4))
+ax.plot(r, 0*r+rope_velocity[0], ls="dashed", color="black", alpha=0.5)
+ax.annotate("ROPE", (r[-1],rope_velocity[0]+1))
+    
+ax.set_xscale("log")
+#ax.yscale("log")
+
+#ax.set_ylim(rope_velocity[0]-20, rope_velocity[1]+20);
+
+ax.set_xlabel("concentration (ng/L)")
+ax.set_ylabel("velocity (microm/s)");
+
+ax2 = ax.twinx()
+ax2.scatter(np.repeat(r, 6), hdi_delta, label="$\Delta$ hdi", color="green", alpha=0.3)
+ax2.errorbar(r, mean_hdi_delta, yerr=std_hdi_delta, fmt="go", label="mean+std ($\Delta$ hdi)", alpha=1)
+ax2.set_ylabel("velocity uncertainty (% of mode)");
+#ax2.set_yscale("log")
+
+fig.legend(bbox_to_anchor=(.68, 0.95) )
+
+fig.tight_layout()
+fig.savefig("velocities_summary.png")
 # -
 
-conc, i+1, hdi[0], hdi[1], mode, nframes
+
