@@ -210,14 +210,6 @@ with bayesian.signalmodel_correlation(corr_mean_combined.T, -np.array([x_lag,]*N
     
     hdi = az.hdi(idata.posterior_predictive, hdi_prob=.95)
 
-fig, axs = plt.subplots(3,1)
-tmp = idata.posterior.centroid.values.flatten()
-tmp2 = idata.posterior.deltac.values.flatten()
-axs[0].hist(tmp);
-axs[1].hist((tmp + tmp2)/(lagstepstart + deltalagstep));
-tmp = idata.posterior.velocitypx.values.flatten()
-axs[2].hist(tmp);
-
 az.plot_pair(
     idata
     ,var_names=["c", "amplitude", "sigma", "centroid", "sigmanoise", "deltac"]
@@ -270,23 +262,10 @@ axs[3].imshow(data_fft_shifted.T)
 axs[3].set_xlabel("length (px)")
 
 fig.tight_layout();
+# -
 
-# +
 data_mean = np.mean(data_fft_shifted[:,startframe:endframe], axis=1)
 data_mean = dataprep.standardize(data_mean)
-
-tmp = np.mean(data_shifted[:,startframe:endframe], axis=1)
-tmp = dataprep.standardize(tmp)
-
-tmp2 = data[:,time]
-
-plt.figure(figsize=figsize)
-plt.plot(data_mean);
-plt.plot(tmp, alpha=0.3)
-plt.plot(tmp2, alpha=0.3)
-plt.xlabel("length (px)")
-plt.ylabel("intensity (-)");
-# -
 
 x = np.arange(0, data_mean.shape[0])
 with bayesian.signalmodel(data_mean, x, artificial=True) as model:
@@ -298,12 +277,6 @@ with bayesian.signalmodel(data_mean, x, artificial=True) as model:
     idata3.to_netcdf(folder+"/idata.nc")
     
     hdi3 = az.hdi(idata3.posterior_predictive, hdi_prob=.95)
-
-fig, axs = plt.subplots(2,1)
-tmp = idata3.posterior.snr.values.flatten()
-axs[0].hist(tmp);
-tmp = idata3.posterior.fmax.values.flatten()/idata3.posterior.sigmanoise.values.flatten()
-axs[1].hist(tmp);
 
 az.plot_pair(
     idata3
