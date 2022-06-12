@@ -14,9 +14,6 @@
 #     name: python3
 # ---
 
-# %load_ext autoreload
-# %autoreload 2
-
 # +
 import matplotlib.pyplot as plt
 import matplotlib as mpl
