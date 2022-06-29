@@ -7,19 +7,12 @@
 #       extension: .py
 #       format_name: percent
 #       format_version: '1.3'
-#       jupytext_version: 1.12.0
+#       jupytext_version: 1.10.2
 #   kernelspec:
 #     display_name: Python 3 (ipykernel)
 #     language: python
 #     name: python3
 # ---
-
-# %% [markdown]
-# File: noise_analyis.py
-#
-# Author:       Lukas Hecht (hecht@fkp.tu-darmstadt.de)
-#
-# Date:         November 26, 2021
 
 # %%
 import helper, dataprep
@@ -50,12 +43,9 @@ axs[0].set_yticks([])
 _, bins, _ = axs[1].hist(s, bins="auto", density=1, alpha=0.5)
 p1, p2, p3 = scipy.stats.skewnorm.fit(s)
 mean, var, skew, kurt = scipy.stats.skewnorm.stats(p1, p2, p3, moments='mvsk')
-#print(mean, var, skew, kurt)
+
 best_fit_line = scipy.stats.skewnorm.pdf(bins, p1, p2, p3)
 axs[1].plot(bins, best_fit_line);
-
-#values = scipy.stats.skewnorm.rvs(p1, p2, p3, 100000)
-#axs[1].hist(values, bins="auto", density=1, alpha=0.5)
 
 p1, p2 = scipy.stats.norm.fit(s)
 best_fit_line = scipy.stats.norm.pdf(bins, p1, p2)
@@ -87,7 +77,6 @@ import dataprep
 # ## Load Data
 
 # %% code_folding=[] hidden=true
-#path = "/home/hecht/Documents/18_industrial/MerckLab_Isotachophoresis/03_data/BackgroundNoise/" 
 path = "../../../../03_data/BackgroundNoise/"
 
 nth = 2
@@ -276,28 +265,12 @@ axs[1].tick_params(axis='both', labelsize=15)
 axs[0].legend(fontsize=25)
 axs[1].legend(fontsize=25)
 
-#axs[0].semilogy()
-#axs[1].semilogy()
-
 plt.show()
 
 # %% hidden=true
 print('LE Mean: ', LEpopt[0]+LEpopt[1]*LEpopt[2]/(1+LEpopt[2]**2)*np.sqrt(2/np.pi))
 print('TE Mean: ', TEpopt[0]+TEpopt[1]*TEpopt[2]/(1+TEpopt[2]**2)*np.sqrt(2/np.pi))
 
-
-# %% [markdown] hidden=true
-# The Gaussian does not fit exactly for some reason. I also tried to fit a skew normal distribution, which does fit better but results in a wrong mean value.
-#
-# Question: Are there different processes that cause the noise values to not be Gaussian distributed?
-
-# %% hidden=true
-
-# %% hidden=true
-
-# %% hidden=true
-
-# %% hidden=true
 
 # %% [markdown] heading_collapsed=true
 # ## Spatial Correlation
@@ -421,23 +394,12 @@ plt.xlabel(r'$\Delta t$ in s')
 plt.ylabel(r'$\langle I(t)I(t+\Delta t)\rangle/\langle I(t)^2\rangle$')
 plt.show()
 
-# %% [markdown] hidden=true
-# LE: Small correlation in time.
-#
-# TE: Uncorrelated.
-
 # %% hidden=true
 # just for one pixel (no averages)
 x = 10; y=50
 cor = correlate(LEfinal[y,x,:], LEfinal[y,x,:])
 plt.plot(np.arange(len(cor[len(cor)//2:]))/fps, cor[len(cor)//2:])
 plt.show()
-
-# %% code_folding=[] hidden=true
-
-# %% code_folding=[] hidden=true
-
-# %% hidden=true
 
 # %% [markdown] heading_collapsed=true
 # ## Spectrum
@@ -475,98 +437,4 @@ ax.set_xlabel('$f$ in Hz', fontsize=25)
 ax.set_ylabel('spectrum in a.u.', fontsize=25)
 ax.legend(fontsize=25)
 ax.semilogx()
-plt.show()
-
-# %% [markdown] hidden=true
-# Not pure white noise ...
-
-# %% code_folding=[0] hidden=true
-
-# %% code_folding=[0] hidden=true
-
-# %% hidden=true
-
-# %% [markdown] heading_collapsed=true
-# ## Some Old Stuff
-
-# %% hidden=true
-# spatial correlation (in y direction; averaged over x direction)
-y0 = [0,25,50,75,100,125]
-
-# LE ======================================================================
-fig, ax = plt.subplots(figsize=(12,8))
-
-for y in y0:
-    cor = 0
-    for i in range(LEdata2.shape[1]):
-        cor += np.mean(LEdata2[y,i,:]*LEdata2[y:,i,:], axis=1)
-
-    cor = cor/(LEdata2.shape[0]-y) 
-    
-    ax.plot(np.arange(LEdata2.shape[0]-y), cor/cor[0], label='$y_0$=%s' %y)
-    
-ax.axhline(0.0, linewidth=1.0, color='k')
-
-ax.tick_params(axis='both', labelsize=15)
-
-ax.legend(fontsize=25)
-
-ax.set_xlabel('$\Delta y$ in px', fontsize=25)
-ax.set_ylabel(r'$\langle I(y_0)I(y_0+\Delta y)\rangle$', fontsize=25)
-
-ax.text(5,0.5,'LE', fontsize=25)
-
-ax.set_xlim(-1, LEdata2.shape[0]-max(y0))
-
-plt.show()
-
-
-# TE ======================================================================
-fig, ax = plt.subplots(figsize=(12,8))
-
-for y in y0:
-    cor = 0
-    for i in range(TEdata2.shape[1]):
-        cor += np.mean(LEdata2[y,i,:]*LEdata2[y:,i,:], axis=1)
-
-    cor = cor/(LEdata2.shape[0]-y) 
-    
-    ax.plot(np.arange(LEdata2.shape[0]-y), cor/cor[0], label='$y_0$=%s' %y)
-    
-ax.axhline(0.0, linewidth=1.0, color='k')
-
-ax.tick_params(axis='both', labelsize=15)
-
-ax.legend(fontsize=25)
-
-ax.set_xlabel('$\Delta y$ in px', fontsize=25)
-ax.set_ylabel(r'$\langle I(y_0)I(y_0+\Delta y)\rangle$', fontsize=25)
-
-ax.text(5,0.5,'TE', fontsize=25)
-
-ax.set_xlim(-1, LEdata2.shape[0]-max(y0))
-
-plt.show()
-
-# %% hidden=true
-# time correlation
-LEcor = np.mean(np.mean(LEfinal[:,:,0].T*LEfinal[:,:,:].T, axis=1), axis=1)
-TEcor = np.mean(np.mean(TEfinal[:,:,0].T*TEfinal[:,:,:].T, axis=1), axis=1)
-
-# %% hidden=true
-# plot
-fig, ax = plt.subplots(figsize=(12,8))
-
-ax.plot(np.arange(LEfinal.shape[2])/fps, LEcor/LEcor[0], label='LE')
-ax.plot(np.arange(TEfinal.shape[2])/fps, TEcor/TEcor[0], label='TE')
-    
-ax.axhline(0.0, linewidth=1.0, color='k')
-
-ax.tick_params(axis='both', labelsize=15)
-
-ax.legend(fontsize=25)
-
-ax.set_xlabel('$t$ in s', fontsize=25)
-ax.set_ylabel(r'$\langle I(0)I(t)\rangle/\langle I(0)^2\rangle$', fontsize=25)
-
 plt.show()
