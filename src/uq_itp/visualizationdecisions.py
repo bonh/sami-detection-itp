@@ -61,17 +61,17 @@ c = ["#EE6677"]#66CCEE"]#228833"]#EE6677"]#coral", "coral", "coral", "coral", "c
 
 #x = np.arange(len(labels))  # the label locations
 x = np.array([0, 1, 2, 3, 4, 4.6, 5.6])
-width = 0.4  # the width of the bars
+width = 0.35  # the width of the bars
 
 fig, ax = plt.subplots(1,1, figsize=figsize)
-ax.bar(x[:-1] - width/2-0.02, n_s[:-1], width, label='Single frame', color=c_s)
-ax.bar(x[:-1] + width/2+0.02, n[:-1], width, label='SAMI w. 200 frames', color=c)
+ax.bar(x[:-1] - width/2-0.02, n_s[:-1], width, label='Single image', color=c_s)
+ax.bar(x[:-1] + width/2+0.02, n[:-1], width, label='SAMI w. 200 images', color=c)
 
 ax.bar(x[-1] - width/2-0.02, n_s[-1], width,  color=c_s, alpha=0.6)
 ax.bar(x[-1] + width/2+0.02, n[-1], width, color=c, alpha=0.6)
 
 ax.vlines(x[5], 0, 5, ls="dashed", color="black")
-ax.set_ylim(-0.1, 5.1)
+ax.set_ylim(-0.2, 5.2)
 
 # Add some text for labels, title and custom x-axis tick labels, etc.
 ax.set_ylabel('Number of correct decisions')

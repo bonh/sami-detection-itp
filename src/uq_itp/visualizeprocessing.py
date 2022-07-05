@@ -447,7 +447,7 @@ ax1.tick_params(axis='y', which='both', labelleft=False, left=False)
 ax1.spines['left'].set_visible(False)
 
 ax1.annotate("", xy=(0,0.1), xycoords="axes fraction", xytext=(1,0.1), arrowprops=dict(arrowstyle='<->'), zorder=0)
-ax1.annotate('ROPE', xy=(0, 0.12), xycoords="axes fraction", xytext=(17, 2), textcoords='offset points', fontsize=6, color="white")
+ax1.annotate('ROPE', xy=(0, 0.12), xycoords="axes fraction", xytext=(17.4, 2), textcoords='offset points', fontsize=6, color="white")
 
 ax1.set_xlabel(r"$v_\mathrm{ITP}$ (\si{\micro\meter\per\second})", fontsize=8);
 ax1.set_xticks(np.linspace(157, 163, 2))
@@ -487,5 +487,7 @@ fig.set_constrained_layout_pads(wspace=1, w_pad=0)
 # -
 
 fig.savefig("imageprocessing.pdf")
+
+
 
 

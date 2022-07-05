@@ -395,18 +395,18 @@ ax2.set_ylim(5,30)
 #fig.legend(bbox_to_anchor=(.5, 0.95) )
 
 #ax.scatter(np.repeat(r, 7).reshape(5,-1), mode_s, label="modes", color="yellow", alpha=0.3)
-l3 = ax.errorbar(r, mean_s, yerr=std_s, mfc="white", label="Single frame", marker="o", ls="none")
+l3 = ax.errorbar(r, mean_s, yerr=std_s, mfc="white", label="Single image", marker="o", ls="none")
 ax.annotate("", (0.8,0.3), xycoords='axes fraction', xytext=(20, 0), textcoords='offset points',arrowprops=dict(arrowstyle="-|>", color=l3[0].get_color()))
 #ax.annotate("", xy=(r[0],mean_s[0]), xytext=(r[1],mean_s[1]), arrowprops=dict(arrowstyle='<->'))
 #ax.annotate("single\nframe", xy=(r[0],mean_s[0]), xytext=(0.70,0.23), textcoords="axes fraction", bbox=dict(fc="w"))
 
 #ax.legend(handles = [l1,l2,l3,l4],loc='upper center', bbox_to_anchor=(0.5, -0.2), ncol=2, fontsize=8, frameon=True)
 lgnd = ax.legend(handles = [l2[0], l4[0]], labels=["Mean mode", "Mean .95 HDI"], loc='upper center', bbox_to_anchor=(0.30, -0.25), ncol=2, fontsize=7
-                 , frameon=True, markerscale=1.0, title="SAMI with 200 frames", title_fontsize=7, labelspacing=0.25, handletextpad=0.05, columnspacing=0.2)
+                 , frameon=True, markerscale=1.0, title="SAMI with 200 images", title_fontsize=7, labelspacing=0.25, handletextpad=0.05, columnspacing=0.2)
 lgnd._legend_box.align = "left"
 
 lgnd2 = ax.legend(handles = [l3[0]], labels=["Mean mode"], loc='upper center', bbox_to_anchor=(0.85, -0.25), ncol=1, fontsize=7
-                 , frameon=True, markerscale=1.0, title="Single frame", title_fontsize=7, labelspacing=0.25, handletextpad=0.05, columnspacing=0.2)
+                 , frameon=True, markerscale=1.0, title="Single image", title_fontsize=7, labelspacing=0.25, handletextpad=0.05, columnspacing=0.2)
 lgnd2._legend_box.align = "left"
 
 ax.add_artist(lgnd)
