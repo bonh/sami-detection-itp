@@ -7,7 +7,7 @@
 #       extension: .py
 #       format_name: light
 #       format_version: '1.5'
-#       jupytext_version: 1.12.0
+#       jupytext_version: 1.10.2
 #   kernelspec:
 #     display_name: Python 3 (ipykernel)
 #     language: python
@@ -54,12 +54,12 @@ from gradient_free_optimizers import *
 from nd2reader import ND2Reader
 # -
 
-# Set parameters: path to data, horizontal position of channel, frames-per-second and pixel width, ROPEs
+# Set parameters: path to data, horizontal position of channel, frames-per-second, pixel width, and ROPEs
 
 # +
 # path to data
 basepath = "/home/cb51neqa/projects/itp/exp_data/2021-12-20/5µA/"
-concentration = "AF647_10ng_l/"
+concentration = "10ng_l/"
 number = "005.nd2"
 inname = basepath + concentration + number
 
@@ -81,7 +81,7 @@ snr_ref = 3
 figsize = np.array([8,8])
 # -
 
-# Load the fluoresence images, cut in vertical direction to channel width, and substract background fluoresence
+# Load the fluoresence images, cut in vertical direction to channel width, and substract background fluoresence:
 
 # +
 # load images from disk
@@ -110,16 +110,37 @@ data_raw = data_raw - background.reshape(background.shape[0], background.shape[1
 
 # -
 
-# Average data over vertical direction or channel width. And standardize data.
+# Average data over vertical direction or channel width and standardize data:
 
 def standardize(data, axis=None):
+    '''
+    Standardizes the given data to zero mean and unit variance.
+    
+    Parameters
+    ----------
+    data : np.ndarray
+        Data array.
+    axis : int, optional
+        Axis over which the data is standardized.
+        The default is None.
+        
+    Returns
+    -------
+    np.ndarray
+        Standardized data array (same shape as input data).
+    '''
     return (data-np.mean(data, axis=axis))/np.std(data, axis=axis)
 
 
+# +
+# average over vertical direction
 data = np.mean(data_raw, axis=0)
+
+# standardize data
 data = standardize(data, axis=0)
 
 # +
+# plot standardized data
 fig, axs = plt.subplots(2,1, figsize=(2*figsize[0], figsize[1]), sharex=True)
 
 time = 150
@@ -137,9 +158,33 @@ fig.tight_layout();
 
 # -
 
-# Apply Fourier filter to data
+# Apply Fourier filter to data:
 
 def fourierfilter(data, rx, ry, rotation, horizontal, vertical):
+    '''
+    Applies a Fourier filter  with a Gaussian window 
+    to the given data.
+    
+    Parameters
+    ----------
+    data : np.ndarray
+        Data array.
+    rx : float
+        Standard deviation of the Gaussian window in x direction.
+    ry : float
+        Standard deviation of the Gaussian window in y direction.
+    rotation : float
+        Angle by which the Gaussian window is rotated.
+    horizontal : bool
+        If True, strong horizontal frequency components are removed.
+    vertical : bool
+        If True, strong vertical frequency components are removed.
+        
+    Returns
+    -------
+    np.ndarray
+        Filtered data array.
+    '''
     ff = np.fft.fft2(data)
     ff = np.fft.fftshift(ff)
        
@@ -164,10 +209,15 @@ def fourierfilter(data, rx, ry, rotation, horizontal, vertical):
     return np.real(iff), window2d, ff
 
 
+# +
+# apply fourier filter
 data_fft, mask, ff = fourierfilter(data, 100, 40/4, -45, True, True)
+
+# standardize filtered data
 data_fft = standardize(data_fft, axis=0)
 
 # +
+# plot filtered data
 fig, axs = plt.subplots(1,4, figsize=(figsize[0]*2, figsize[1]), sharey=True)
 
 axs[0].imshow(data.T, origin="lower")
@@ -190,10 +240,27 @@ fig.tight_layout();
 
 # -
 
-# Calculate cross-correlation function with different frame lags inbetween and average all the frames.
+# Calculate cross-correlation function with different frame lags in between and average all frames:
 
 # +
 def correlate_frames(data, step):
+    '''
+    Calculates the spatial correlation between all frames
+    for a fixed time lag between the frames.
+    
+    Parameters
+    ----------
+    data : np.ndarray
+        Data array of shape (#x-values, #frames).
+    step : int
+        Time lag in frames.
+        
+    Returns
+    -------
+    np.ndarray
+        Data array of shape (#x-lags, #frames-step) containing
+        the spatial correlation between the frames.
+    '''
     corr = np.zeros((data.shape[0], data.shape[1]-step))
     for i in range(0,data.shape[1]-step):
         corr[:,i] = np.correlate(data[:,i], data[:,i+step], "same")
@@ -201,20 +268,54 @@ def correlate_frames(data, step):
     return corr
 
 def correlation(data, startframe, endframe, lagstepstart=30, deltalagstep=5, N=8):
+    '''
+    Calculates the spatial correlation between all frames
+    averaged over time for N different time lags.
+    
+    Parameters
+    ----------
+    data : np.ndarray
+        Data array of shape (#x-values, #frames).
+    startframe : int
+        Index of the first frame to consider.
+    endframe : int
+        Index of the last frame to consider.
+    lagstepstart : int, optional
+        Smallest time lag in frames. The default is 10.
+    deltalagstep : int, optional
+        Distance between the different time lags in frames. 
+        The default is 5.
+    N : int, optional
+        Number of different time lags. The default is 8.
+        
+    Returns
+    -------
+    np.ndarray
+        Spatial lags.
+    np.ndarray
+        Data array of shape (N,len(x_lag)) containing the
+        spatial correlation functions for the different time lags.
+    
+    '''
     length = int(data.shape[0]/2)
     corr_mean_combined = np.zeros((N, length))
 
     for i in range(0, N):
         lagstep = lagstepstart + i*deltalagstep
+        
+        # calculate spatial correlation
         corr = correlate_frames(data, lagstep)
+        
+        # standardize data
         corr = standardize(corr)
         
+        # average over time
         corr_mean = np.mean(corr[:,startframe:endframe-lagstep], axis=1)
         
         # clean the correlation data
         # remove peak at zero lag
         corr_mean[length] = 0
-        #cut everything right of the middle (because we know that the velocity is positiv)
+        # cut everything right of the middle (because we know that the velocity is positiv)
         corr_mean = corr_mean[0:length]
     
         corr_mean_combined[i,:] = standardize(corr_mean)
@@ -227,6 +328,29 @@ def correlation(data, startframe, endframe, lagstepstart=30, deltalagstep=5, N=8
 # -
 
 def signalmodel_correlation(data, x, px, deltalagstep, lagstepstart, fps):
+    '''
+    Creates the signal model for the correlation function.
+    
+    Parameters
+    ----------
+    data : np.ndarray
+        Data array.
+    x : np.ndarray
+        Spatial lags in x direction.
+    px : float
+        Inverse pixel density in µm/px
+    deltalagstep : 
+        Distance between the different time lags in frames.
+    lagstepstart :
+        Smallest time lag in frames.
+    fps : int
+        Frame rate in frames per second.
+    
+    Returns
+    -------
+    pymc3.model.Model
+        Signal model for the correlation function.
+    '''
     
     N = x.shape[1]
     length = x.shape[0]
@@ -269,6 +393,7 @@ def signalmodel_correlation(data, x, px, deltalagstep, lagstepstart, fps):
 
 
 # +
+# calculate correlation functions
 N = 4
 deltalagstep = 10
 lagstepstart = 30
@@ -310,6 +435,7 @@ if False:
 x_lag, corr_mean_combined = correlation(data_fft, startframe, endframe, lagstepstart=lagstepstart, deltalagstep=deltalagstep, N=N)
 
 # +
+# plot spatial correlation functions
 fig, axs = plt.subplots(1,2, figsize=(figsize[0]*2, figsize[1]/2), sharey=True)
 
 axs[0].plot(x_lag, corr_mean_combined.T[:,0]);
@@ -325,6 +451,7 @@ fig.tight_layout()
 
 # Fit Bayesian model to the cross-correlation functions to obtain isotachophoretic velocity (of course we did that already above while looking for the optimal start and end frames).
 
+# fit the Bayesian model
 with signalmodel_correlation(corr_mean_combined.T, -np.array([x_lag,]*N).T, px, deltalagstep, lagstepstart, fps) as model:
     trace = pm.sample(2000, tune=2000, return_inferencedata=False, cores=4, target_accept=0.9)
       
@@ -333,6 +460,7 @@ with signalmodel_correlation(corr_mean_combined.T, -np.array([x_lag,]*N).T, px, 
     hdi = az.hdi(idata.posterior_predictive, hdi_prob=.95)
 
 # +
+# plot results
 fig, axs = plt.subplots(1, 2, figsize=(figsize[0]*2, figsize[1]/2))
 axs[0].plot(x_lag, corr_mean_combined.T, "b", alpha=0.5, label="data");
 axs[0].plot(x_lag, idata.posterior_predictive.mean(("chain", "draw"))["y"], label="fit", color="r")
@@ -355,7 +483,7 @@ axs[1].set_xlabel(r"v_ITP ($\mu m/s$)");
 fig.tight_layout()
 # -
 
-# Shift data with most probable velocity
+# Shift data with most probable velocity:
 
 # +
 # get mode of velocity distribution
@@ -372,12 +500,13 @@ for i in range(0, data.shape[1]):
     data_shifted[:,i] = np.roll(data[:,i], shift)
 # -
 
-# Again apply Fourier filter to data stack
+# Again, apply Fourier filter to data stack:
 
 data_fft_shifted, mask_shifted, ff_shifted = fourierfilter(data_shifted, 30, 30, 0, True, False)
 data_fft_shifted = standardize(data_fft_shifted)
 
 # +
+# plot filtered and shifted data
 fig, axs = plt.subplots(1,4, figsize=2*figsize, sharey=True)
 
 axs[0].imshow(data_shifted.T, origin="lower")
@@ -398,12 +527,12 @@ axs[3].set_title("Resulting image")
 fig.tight_layout();
 # -
 
-# Average the frames
+# Average the shifted and filtered frames (time average):
 
 data_mean = np.mean(data_fft_shifted[:,startframe:endframe], axis=1)
 data_mean = standardize(data_mean)
 
-# Fit Bayesian model to the shifted and averaged data
+# Fit Bayesian model to the shifted and averaged data:
 
 # +
 x = np.arange(0, data_mean.shape[0])
@@ -455,6 +584,7 @@ with pm.Model() as model:
     hdi3 = az.hdi(idata3.posterior_predictive, hdi_prob=.95)
 
 # +
+# plot results
 fig = plt.figure(constrained_layout=True, figsize=(figsize[0]*2, figsize[1]/2))
 gs = GridSpec(1, 4, figure=fig)
 
@@ -479,9 +609,10 @@ ax.set_xlabel(r"SNR (-)");
 #fig.tight_layout()
 # -
 
-# Decide a sample is present by comparing the 95% HDIs of velocity, spread, and SNR with their ROPEs
+# Decide if a sample is present by comparing the 95% HDIs of velocity, spread, and SNR with their ROPEs:
 
 # +
+# show final decision
 fig, ax = plt.subplots(figsize=figsize/2)
 ax.axis('off')
 
@@ -504,3 +635,6 @@ else:
     rect = mpl.patches.Rectangle((0, 0), 1, 1, facecolor='lightcoral')
     ax.add_patch(rect)
     ax.text(0.5, 0.5, 'Sample absent!', horizontalalignment='center', verticalalignment='center')
+# -
+
+
