@@ -1,0 +1,35 @@
+name: itp
+channels:
+  - ngsolve
+  - conda-forge
+  - defaults
+dependencies:
+  - nd2reader
+  - jupyterlab
+  - ca-certificates
+  - certifi
+  - openssl
+  - jupytext
+  - scipy
+  - pymc3
+  - seaborn
+  - nevergrad
+  - scikit-optimize
+  - nptdms
+  - scikit-image
+  - patsy
+  - arviz
+  - pyimagej
+  - octave
+  - python-graphviz
+  - bokeh
+  - plotly
+  - sympy
+  - ipywidgets
+  - mpi4py
+  - git
+  - tabulate
+  - proplot
+  - jupyterlab_vim
+  - statsmodels
+prefix: /home/cb51neqa/miniconda3/envs/itp
