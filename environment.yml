@@ -13,7 +13,6 @@ dependencies:
   - scipy
   - pymc3
   - seaborn
-  - nevergrad
   - scikit-optimize
   - nptdms
   - scikit-image
@@ -32,4 +31,6 @@ dependencies:
   - proplot
   - jupyterlab_vim
   - statsmodels
-prefix: /home/cb51neqa/miniconda3/envs/itp
+  - pip
+  - pip:
+    - gradient-free-optimizers
