@@ -1,0 +1,5 @@
+set -ex
+
+jupyter lab build
+
+jupytext --set-formats ipynb,py ReferenceImplementation.py
