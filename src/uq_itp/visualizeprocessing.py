@@ -22,6 +22,7 @@ import matplotlib.pyplot as plt
 import matplotlib as mpl
 from matplotlib.gridspec import GridSpec
 from matplotlib.patches import ConnectionPatch
+from matplotlib.ticker import AutoMinorLocator, FixedLocator, FixedFormatter
 import numpy as np
 import pymc3 as pm
 import arviz as az
@@ -226,11 +227,11 @@ axmain.set_title(r"Concentration \SI{10}{\nano\gram\per\liter}")
 axmain.annotate("A: Cut to channel and background subtracted\
                 \n$I(x, y, n=100)$", xy=(0.01,0.95), xycoords='axes fraction', color="w", horizontalalignment="left", verticalalignment="top", weight="bold")
 axmain.imshow(data_raw[:,:,time], aspect="auto", cmap="viridis");
-axmain.set_yticks(np.linspace(0, height, 3))
+axmain.set_yticks(np.linspace(0, height, 2))
 axmain.set_ylabel("$y$ (px)");
 axmain.yaxis.set_label_coords(-0.03, 0.5)
 axmain.tick_params(labelbottom = False)
-axmain.tick_params(labelleft = False)
+#axmain.tick_params(labelleft = False)
 
 #
 ax = fig.add_subplot(gs[1, 0], sharex=axmain)
@@ -262,8 +263,8 @@ ax.set_yticks([0, 460])
 
 #
 ax = fig.add_subplot(gs[3, 0])
-ax.plot(x_lag, corr_mean_combined.T[:,0], color=c_data, alpha=1.0, label="data");
-ax.plot(x_lag, idatacross.posterior_predictive.mean(("chain", "draw"))["y"][:,0], label="fit", color=c_fit)
+ax.plot(x_lag+1, corr_mean_combined.T[:,0], color=c_data, alpha=1.0, label="data");
+ax.plot(x_lag+1, idatacross.posterior_predictive.mean(("chain", "draw"))["y"][:,0], label="fit", color=c_fit)
 ax.annotate("D: Correlated, averaged, and fitted\n$X_{N_n}^{L=30}(\Delta x)$", xy=(0.01,0.95), xycoords='axes fraction', color="black", horizontalalignment="left", verticalalignment="top", weight="bold")
 #for i in [-1]:
 #    ax.plot(x_lag, corr_mean_combined.T[:,i], "b", alpha=0.3);
@@ -271,15 +272,17 @@ ax.annotate("D: Correlated, averaged, and fitted\n$X_{N_n}^{L=30}(\Delta x)$", x
 ax.set_xlabel("$\Delta x$ (\si{\pixel})")
 ax.set_ylabel("$X_{N_n}^L$ (-)")
 ax.yaxis.set_label_coords(-0.03, 0.5)
-ax.tick_params(labelleft = False)
 #ax.xaxis.set_label_coords(0.5, -0.1)
 ax.tick_params(axis='y', which='both', labelleft=False, left=False)
 ax.spines['left'].set_visible(False)
-ax.set_xticks([-1, -128, -256])
-ax.set_xticklabels([0,-128,-256])
+ticks = -np.linspace(0, 255, 3)
+ax.xaxis.set_major_locator(FixedLocator(ticks))
+ax.xaxis.set_major_formatter(FixedFormatter([0, -128, -256]))
+minorticks = -np.linspace(0, 255, 3*3)
+ax.xaxis.set_minor_locator(FixedLocator(minorticks))
 
 for i in [0]:#range(0,N):
-    ax.fill_between(x_lag, hdicross["y"][:,i,0], hdicross["y"][:,i,1], alpha=0.2, label=".95 HDI", color="r");
+    ax.fill_between(x_lag+1, hdicross["y"][:,i,0], hdicross["y"][:,i,1], alpha=0.2, label=".95 HDI", color="r");
     
 handles, labels = ax.get_legend_handles_labels()
 #ax.legend([handles[0], handles[N], handles[-1]], [labels[0], labels[N], labels[-1]]);
@@ -322,11 +325,11 @@ fig.texts.append(ax1.texts.pop())
 #ax1.set_title("G: Marginal posterior distributions and detection", x=1.5)
 xmin, xmax = 162.5, 163.5
 tmp = idatacross.posterior.velocity.values.flatten()
-ax1.hist(tmp, bins="auto", density=True, alpha=1.0, color=c_hist, rwidth=1)
+ax1.hist(tmp, bins="auto", density=True, histtype='stepfilled', alpha=1.0, color=c_hist, rwidth=1)
 ax1.tick_params(axis='y', which='both', labelleft=False, left=False)
 ax1.spines['left'].set_visible(False)
 
-ax1.annotate("", xy=(0,0.1), xycoords="axes fraction", xytext=(1,0.1), arrowprops=dict(arrowstyle='<->'), zorder=0)
+ax1.annotate("", xy=(0,0.1), xycoords="axes fraction", xytext=(1,0.1), arrowprops=dict(arrowstyle='<->'), zorder=10)
 ax1.annotate('ROPE', xy=(0, 0.12), xycoords="axes fraction", xytext=(10, 2), textcoords='offset points', fontsize=6)
 
 ax1.set_xlabel(r"$v_\mathrm{ITP}$ (\si{\micro\meter\per\second})", fontsize=8);
@@ -338,11 +341,11 @@ ax1.set_xticks(np.linspace(157, 163, 2))
 ax2 = fig.add_subplot(gs0[0,2])
 xmin, xmax = 4,9
 tmp = idata.posterior.sigma.values.flatten()
-ax2.hist(tmp, bins="auto", density=True,alpha=1.0, color=c_hist, rwidth=1)
+ax2.hist(tmp, bins="auto", density=True, histtype='stepfilled',alpha=1.0, color=c_hist, rwidth=1)
 ax2.tick_params(axis='y', which='both', labelleft=False, left=False)
 ax2.spines['left'].set_visible(False)
 
-ax2.annotate("", xy=(0,0.1), xycoords="axes fraction", xytext=(1,0.1), arrowprops=dict(arrowstyle='<->'), zorder=0)
+ax2.annotate("", xy=(0,0.1), xycoords="axes fraction", xytext=(1,0.1), arrowprops=dict(arrowstyle='<->'), zorder=10)
 ax2.annotate('ROPE', xy=(0, 0.12), xycoords="axes fraction", xytext=(10, 2), textcoords='offset points', fontsize=6)
 
 ax2.set_xlabel(r"$w$ (\si{\pixel})", fontsize=8);
@@ -354,7 +357,7 @@ ax2.set_xticks(np.linspace(4.8, 8.7, 2))
 ax = fig.add_subplot(gs0[0,3])
 xmin, xmax = 0,100
 tmp = idata.posterior.snr.values.flatten()
-ax.hist(tmp, bins="auto", density=True,alpha=1.0, color=c_hist, rwidth=1)
+ax.hist(tmp, bins="auto", density=True, histtype='stepfilled',alpha=1.0, color=c_hist, rwidth=1)
 ax.tick_params(axis='y', which='both', labelleft=False, left=False)
 ax.spines['left'].set_visible(False)
 
@@ -393,8 +396,8 @@ ax.set_yticks([0, 460])
 
 #
 ax = fig.add_subplot(gs[3, 1])
-ax.plot(x_lag, corr_mean_combined.T[:,0], color=c_data, label="data");
-ax.plot(x_lag, idatacross.posterior_predictive.mean(("chain", "draw"))["y"][:,0], label="fit", color=c_fit)
+ax.plot(x_lag+1, corr_mean_combined.T[:,0], color=c_data, label="data");
+ax.plot(x_lag+1, idatacross.posterior_predictive.mean(("chain", "draw"))["y"][:,0], label="fit", color=c_fit)
 #for i in [-1]:
 #    ax.plot(x_lag, corr_mean_combined.T[:,i], "b", alpha=0.3);
 #    ax.plot(x_lag, idata.posterior_predictive.mean(("chain", "draw"))["y"][:,i], label="fit", color="r")
@@ -403,11 +406,14 @@ ax.tick_params(labelleft = False)
 #ax.xaxis.set_label_coords(0.5, -0.1)
 ax.tick_params(axis='y', which='both', labelleft=False, left=False)
 ax.spines['left'].set_visible(False)
-ax.set_xticks([-1,-128,-256])
-ax.set_xticklabels([0,-128,-256])
+ticks = -np.linspace(0, 255, 3)
+ax.xaxis.set_major_locator(FixedLocator(ticks))
+ax.xaxis.set_major_formatter(FixedFormatter([0, -128, -256]))
+minorticks = -np.linspace(0, 255, 3*3)
+ax.xaxis.set_minor_locator(FixedLocator(minorticks))
 
 for i in [0]:#range(0,N):
-    ax.fill_between(x_lag, hdicross["y"][:,i,0], hdicross["y"][:,i,1], alpha=0.2, label=".95 HDI", color=c_fit);
+    ax.fill_between(x_lag+1, hdicross["y"][:,i,0], hdicross["y"][:,i,1], alpha=0.2, label=".95 HDI", color=c_fit);
     
 handles, labels = ax.get_legend_handles_labels()
 #ax.legend([handles[0], handles[N], handles[-1]], [labels[0], labels[N], labels[-1]]);
@@ -417,6 +423,7 @@ ax = fig.add_subplot(gs[4, 1], sharex=axmain)
 ax.imshow(data_shifted.T, aspect="auto", cmap="viridis")
 ax.tick_params(labelbottom = False)
 ax.tick_params(labelleft = False)
+ax.set_yticks([0, 460])
 
 #
 ax = fig.add_subplot(gs[5, 1], sharex=axmain)
@@ -442,12 +449,12 @@ ax1 = fig.add_subplot(gs0[0,1])
 #ax1.set_title("G: Marginal posteriors and detection", x=0.8)
 xmin, xmax = 157, 162
 tmp = idatacross.posterior.velocity.values.flatten()
-ax1.hist(tmp, bins="auto", density=True, color=c_hist, rwidth=1)
+ax1.hist(tmp, bins="auto", density=True, histtype='stepfilled', color=c_hist, rwidth=1)
 ax1.tick_params(axis='y', which='both', labelleft=False, left=False)
 ax1.spines['left'].set_visible(False)
 
-ax1.annotate("", xy=(0,0.1), xycoords="axes fraction", xytext=(1,0.1), arrowprops=dict(arrowstyle='<->'), zorder=0)
-ax1.annotate('ROPE', xy=(0, 0.12), xycoords="axes fraction", xytext=(17.4, 2), textcoords='offset points', fontsize=6, color="white")
+ax1.annotate("", xy=(0,0.1), xycoords="axes fraction", xytext=(1,0.1), arrowprops=dict(arrowstyle='<->'), zorder=11111111110)
+ax1.annotate('ROPE', xy=(0, 0.12), xycoords="axes fraction", xytext=(17.9, 2), textcoords='offset points', fontsize=6, color="white")
 
 ax1.set_xlabel(r"$v_\mathrm{ITP}$ (\si{\micro\meter\per\second})", fontsize=8);
 ax1.set_xticks(np.linspace(157, 163, 2))
@@ -456,12 +463,12 @@ ax1.set_xticks(np.linspace(157, 163, 2))
 ax2 = fig.add_subplot(gs0[0,2])
 xmin, xmax = 4,9
 tmp = idata.posterior.sigma.values.flatten()
-ax2.hist(tmp, bins="auto", density=True, color=c_hist, rwidth=1)
+ax2.hist(tmp, bins="auto", density=True, histtype='stepfilled', color=c_hist, rwidth=1)
 ax2.tick_params(axis='y', which='both', labelleft=False, left=False)
 ax2.spines['left'].set_visible(False)
 
-ax2.annotate("", xy=(0,0.1), xycoords="axes fraction", xytext=(1,0.1), arrowprops=dict(arrowstyle='<->'), zorder=0)
-ax2.annotate('ROPE', xy=(0, 0.12), xycoords="axes fraction", xytext=(25, 2), textcoords='offset points', fontsize=6)
+ax2.annotate("", xy=(0,0.1), xycoords="axes fraction", xytext=(1,0.1), arrowprops=dict(arrowstyle='<->'), zorder=10)
+ax2.annotate('ROPE', xy=(0, 0.12), xycoords="axes fraction", xytext=(25.6, 2), textcoords='offset points', fontsize=6)
 
 ax2.set_xlabel(r"$w$ (\si{\pixel})", fontsize=8);
 ax2.set_xticks(np.linspace(4.8, 8.7, 2))
@@ -470,7 +477,7 @@ ax2.set_xticks(np.linspace(4.8, 8.7, 2))
 ax = fig.add_subplot(gs0[0,3])
 xmin, xmax = 0,100
 tmp = idata.posterior.snr.values.flatten()
-ax.hist(tmp, bins="auto", density=True, color=c_hist, rwidth=1)
+ax.hist(tmp, bins="auto", density=True, histtype='stepfilled', color=c_hist, rwidth=1)
 ax.tick_params(axis='y', which='both', labelleft=False, left=False)
 ax.spines['left'].set_visible(False)
 
