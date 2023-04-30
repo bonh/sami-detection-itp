@@ -1,3 +1,5 @@
+[![DOI](https://zenodo.org/badge/511558592.svg)](https://zenodo.org/badge/latestdoi/511558592)
+
 The following code is the minimal reference implementation of the signal processing presented in 10.1021/acs.analchem.3c00321. 
 Please have a look at the branch `dev` for a more structured implementation as well as visualization scripts.
 
